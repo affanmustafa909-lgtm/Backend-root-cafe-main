@@ -4,6 +4,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci
 COPY . .
+RUN mkdir -p uploads
 RUN npx prisma generate
 RUN npm run build
 
@@ -14,7 +15,6 @@ COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci --omit=dev && npx prisma generate
 COPY --from=builder /app/dist ./dist
-RUN mkdir -p /app/uploads
-COPY uploads ./uploads
+COPY --from=builder /app/uploads ./uploads
 EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
