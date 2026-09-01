@@ -36,7 +36,7 @@ export default (): AppConfiguration => ({
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   corsOrigins: (
     process.env.CORS_ORIGINS ??
-    'http://localhost:5173,http://localhost:3000,http://localhost:8081'
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:8081'
   )
     .split(',')
     .map((origin) => origin.trim())
