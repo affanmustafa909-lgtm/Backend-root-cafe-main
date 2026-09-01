@@ -4,7 +4,6 @@ dist
 .gitignore
 .env
 coverage
-uploads
 *.md
 .agents
 .claude
