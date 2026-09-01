@@ -56,6 +56,12 @@ export const menuCategories: MenuCategory[] = [
     description: 'Thick, creamy shakes',
     sortOrder: 6,
   },
+  {
+    id: 'menu-cat-protein',
+    name: 'Protein Drinks',
+    description: 'High-protein shakes — hot or iced',
+    sortOrder: 7,
+  },
 ];
 
 const HOT = 'menu-cat-hot';
@@ -78,7 +84,7 @@ export const menuProducts: MenuProduct[] = [
   { id: 'menu-caramel-macchiato', name: 'Caramel Macchiato', description: 'Vanilla milk marked with espresso & caramel', price: 5.0, categoryId: HOT, sortOrder: 9, imageFile: 'caramel-macchiato.jpg', allergens: 'Milk' },
   { id: 'menu-chai-latte', name: 'Chai Latte', description: 'Spiced chai with steamed milk', price: 5.0, categoryId: HOT, sortOrder: 10, allergens: 'Milk' },
   { id: 'menu-latte-macchiato', name: 'Latte Macchiato', description: 'Steamed milk marked with espresso', price: 4.0, categoryId: HOT, sortOrder: 11, imageFile: 'latte-macchiato.jpg', allergens: 'Milk' },
-  { id: 'menu-matcha-latte', name: 'Matcha Latte', description: 'Ceremonial matcha whisked with milk', price: 5.0, categoryId: HOT, sortOrder: 12, allergens: 'Milk' },
+  { id: 'menu-matcha-latte', name: 'Matcha Latte', description: 'Ceremonial matcha whisked with milk', price: 5.0, categoryId: MATCHA, sortOrder: 7, imageFile: 'matcha-latte.jpg', allergens: 'Milk' },
   { id: 'menu-hot-chocolate', name: 'Hot Chocolate', description: 'Rich cocoa drink', price: 3.8, categoryId: HOT, sortOrder: 13, imageFile: 'hot-chocolate.jpg', allergens: 'Milk' },
   { id: 'menu-hot-chocolate-sahne', name: 'Hot Chocolate mit Sahne', description: 'Hot chocolate topped with whipped cream', price: 4.5, categoryId: HOT, sortOrder: 14, allergens: 'Milk' },
   { id: 'menu-lavender-latte', name: 'Lavender Latte', description: 'Floral lavender infused latte', price: 5.0, categoryId: HOT, sortOrder: 15, imageFile: 'lavender-latte.jpg', allergens: 'Milk' },
