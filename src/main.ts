@@ -7,6 +7,24 @@ import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { uploadDirectory } from './uploads/storage.js';
 
+function isAllowedCorsOrigin(origin: string | undefined, allowed: string[]): boolean {
+  if (!origin) return true;
+  if (allowed.includes('*') || allowed.includes(origin)) return true;
+  for (const rule of allowed) {
+    if (!rule.includes('*')) continue;
+    const pattern = rule
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\*/g, '.*');
+    if (new RegExp(`^${pattern}$`).test(origin)) return true;
+  }
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === 'vercel.app' || hostname.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
@@ -18,7 +36,9 @@ async function bootstrap() {
     }),
   );
   app.enableCors({
-    origin: config.get<string[]>('corsOrigins'),
+    origin: (origin, callback) => {
+      callback(null, isAllowedCorsOrigin(origin, config.get<string[]>('corsOrigins') ?? []));
+    },
     credentials: true,
   });
   app.useGlobalPipes(
