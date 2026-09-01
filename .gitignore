@@ -17,9 +17,13 @@ npm-debug.log*
 coverage
 .nyc_output
 
-# uploads
-/uploads/*
-!/uploads/.gitkeep
+# uploads (menu images ship with Docker for production)
+uploads/*
+!uploads/.gitkeep
+!uploads/menu/
+!uploads/menu/**
+!uploads/onboarding/
+!uploads/onboarding/**
 
 # IDE
 .idea
