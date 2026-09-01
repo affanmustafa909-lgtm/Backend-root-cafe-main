@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+coverage
+uploads
+*.md
+.agents
+.claude
+.cursor
+.devin
+*.tsbuildinfo

@@ -1,0 +1,33 @@
+# compiled output
+/dist
+/node_modules
+/build
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# tests / coverage
+coverage
+.nyc_output
+
+# uploads
+/uploads/*
+!/uploads/.gitkeep
+
+# IDE
+.idea
+.vscode
+.DS_Store
+
+# AI assistant scaffolds
+.agents/
+.claude/
+.cursor/
+.devin/
