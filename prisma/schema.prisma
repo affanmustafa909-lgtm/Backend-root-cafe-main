@@ -66,6 +66,7 @@ model User {
   orders        Order[]
   deviceTokens  DeviceToken[]
   notifications Notification[]
+  stampCard     CustomerStampCard?
 
   @@index([role])
   @@index([email])
@@ -182,7 +183,26 @@ model AppConfig {
   pickupSlotIntervalMin Int?
   pickupMaxDaysAhead    Int?
   asapEstimateMinutes   Int?
+  /** Digital stamp card — collect N stamps, next drink free. */
+  stampCardEnabled      Boolean  @default(true)
+  /** Stamps needed before a free drink (8 → 9th drink free). */
+  stampCardRequired     Int      @default(8)
+  stampCardTitle        String?  @default("Stamp Card")
+  stampCardSubtitle     String?  @default("Collect 8 drinks on the app — the 9th is free")
   updatedAt             DateTime @updatedAt
+}
+
+/** One stamp card per customer. */
+model CustomerStampCard {
+  id               String   @id @default(cuid())
+  customerId       String   @unique
+  stamps           Int      @default(0)
+  lifetimeStamps   Int      @default(0)
+  freeDrinksEarned Int      @default(0)
+  updatedAt        DateTime @updatedAt
+  customer         User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([stamps])
 }
 
 model OnboardingSlide {
@@ -217,6 +237,11 @@ model Order {
   tax           Decimal       @db.Decimal(10, 2)
   total         Decimal       @db.Decimal(10, 2)
   notes         String?
+  /** True when checkout redeemed a free stamp-card drink. */
+  redeemedStampReward Boolean @default(false)
+  freeDrinkDiscount   Decimal @default(0) @db.Decimal(10, 2)
+  /** Set once when COMPLETED and stamp was applied. */
+  stampApplied  Boolean       @default(false)
   statusChangedAt DateTime    @default(now())
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

@@ -23,6 +23,7 @@ import {
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -47,6 +48,10 @@ import {
 } from '../realtime/realtime.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { PickupSettingsService } from '../settings/pickup-settings.service.js';
+import {
+  StampCardModule,
+  StampCardService,
+} from '../loyalty/stamp-card.service.js';
 
 class OrderItemDto {
   @IsString() productId: string;
@@ -58,6 +63,8 @@ class CreateOrderDto {
   @IsOptional() @IsString() pickupDate?: string;
   @IsOptional() @IsString() pickupTime?: string;
   @IsOptional() @IsString() notes?: string;
+  /** Redeem stamp-card free drink (9th drink free). */
+  @IsOptional() @IsBoolean() redeemFreeDrink?: boolean;
   @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => OrderItemDto)
   items: OrderItemDto[];
 }
@@ -88,6 +95,7 @@ class OrdersService {
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
     private readonly pickupSettings: PickupSettingsService,
+    private readonly stampCards: StampCardService,
   ) {}
 
   private async validateScheduledPickup(
@@ -187,10 +195,24 @@ class OrdersService {
       );
       return { item, product, chosen, unit, total: unit.mul(item.quantity) };
     });
-    const subtotal = lines.reduce(
+    let subtotal = lines.reduce(
       (total, line) => total.plus(line.total),
       new Prisma.Decimal(0),
     );
+    let freeDrinkDiscount = new Prisma.Decimal(0);
+    let redeemedStampReward = false;
+    if (dto.redeemFreeDrink) {
+      await this.stampCards.assertCanRedeem(userId);
+      freeDrinkDiscount = this.stampCards.pickFreeDrinkDiscount(lines);
+      if (freeDrinkDiscount.lessThanOrEqualTo(0)) {
+        throw new BadRequestException('No drink available to redeem as free');
+      }
+      subtotal = Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        subtotal.minus(freeDrinkDiscount),
+      );
+      redeemedStampReward = true;
+    }
     const taxRate = new Prisma.Decimal(this.config.get<number>('taxRate') ?? 0);
     const tax = subtotal.mul(taxRate);
     const total = subtotal.plus(tax);
@@ -225,6 +247,8 @@ class OrdersService {
             subtotal,
             tax,
             total,
+            redeemedStampReward,
+            freeDrinkDiscount,
             items: {
               create: lines.map(({ item, product, chosen, unit, total: lineTotal }) => ({
                 productId: product.id,
@@ -246,7 +270,7 @@ class OrdersService {
           include: orderInclude,
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 },
     );
     const created = serialize(order);
     this.realtime.emitAdmin('order.created', created);
@@ -264,8 +288,49 @@ class OrdersService {
   async updateStatus(id: string, status: OrderStatus) {
     const current = await this.prisma.order.findUnique({ where: { id } });
     if (!current) throw new NotFoundException();
-    if (transitions[current.status] !== status)
-      throw new BadRequestException('Invalid status transition');
+
+    // Idempotent: already at requested status (double-click / stale UI).
+    if (current.status === status) {
+      const existing = await this.prisma.order.findUniqueOrThrow({
+        where: { id },
+        include: orderInclude,
+      });
+      if (
+        status === OrderStatus.COMPLETED &&
+        !existing.stampApplied
+      ) {
+        try {
+          await this.stampCards.applyOnOrderCompleted({
+            id: existing.id,
+            customerId: existing.customerId,
+            redeemedStampReward: existing.redeemedStampReward,
+            stampApplied: existing.stampApplied,
+          });
+          const stampView = await this.stampCards.getCustomerView(
+            existing.customerId,
+          );
+          this.realtime.emitCustomer(
+            existing.customerId,
+            'loyalty.stamp_updated',
+            stampView,
+          );
+        } catch (err) {
+          console.error('Stamp card apply failed (idempotent path)', err);
+        }
+      }
+      const refreshed = await this.prisma.order.findUniqueOrThrow({
+        where: { id },
+        include: orderInclude,
+      });
+      return serialize(refreshed);
+    }
+
+    if (transitions[current.status] !== status) {
+      throw new BadRequestException(
+        `Invalid status transition (${current.status} → ${status})`,
+      );
+    }
+
     const order = await this.prisma.order.update({
       where: { id },
       data: {
@@ -277,11 +342,38 @@ class OrdersService {
       },
       include: orderInclude,
     });
-    const serialized = serialize(order);
+
+    if (status === OrderStatus.COMPLETED) {
+      try {
+        await this.stampCards.applyOnOrderCompleted({
+          id: order.id,
+          customerId: order.customerId,
+          redeemedStampReward: order.redeemedStampReward,
+          stampApplied: order.stampApplied,
+        });
+      } catch (err) {
+        // Never fail order completion because loyalty failed.
+        console.error('Stamp card apply failed', err);
+      }
+    }
+
+    const fresh = await this.prisma.order.findUniqueOrThrow({
+      where: { id },
+      include: orderInclude,
+    });
+    const serialized = serialize(fresh);
     this.realtime.emitAdmin('order.updated', serialized);
     this.realtime.emitAdmin('order.status_changed', serialized);
     this.realtime.emitCustomer(order.customerId, 'order.updated', serialized);
     this.realtime.emitCustomer(order.customerId, 'order.status_changed', serialized);
+    if (status === OrderStatus.COMPLETED) {
+      try {
+        const stampView = await this.stampCards.getCustomerView(order.customerId);
+        this.realtime.emitCustomer(order.customerId, 'loyalty.stamp_updated', stampView);
+      } catch (err) {
+        console.error('Stamp card emit failed', err);
+      }
+    }
     if (status === OrderStatus.READY_FOR_PICKUP)
       void this.notifications.send(
         order.customerId,
@@ -384,7 +476,7 @@ class AdminOrdersController {
 }
 
 @Module({
-  imports: [RealtimeModule, NotificationsModule, SettingsModule],
+  imports: [RealtimeModule, NotificationsModule, SettingsModule, StampCardModule],
   controllers: [CustomerOrdersController, AdminOrdersController],
   providers: [OrdersService],
 })
