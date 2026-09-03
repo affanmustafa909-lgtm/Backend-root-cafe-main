@@ -70,6 +70,7 @@ const TEA = 'menu-cat-tea';
 const MATCHA = 'menu-cat-matcha';
 const FRAPPE = 'menu-cat-frappe';
 const SHAKE = 'menu-cat-milkshake';
+const PROTEIN = 'menu-cat-protein';
 
 export const menuProducts: MenuProduct[] = [
   // Hot Drinks
@@ -92,13 +93,20 @@ export const menuProducts: MenuProduct[] = [
 
   // Cold Coffee & Iced Drinks
   { id: 'menu-iced-americano', name: 'Iced Americano', description: 'Espresso over ice & water', price: 3.5, categoryId: COLD, sortOrder: 1, imageFile: 'iced-americano.jpg' },
-  { id: 'menu-iced-latte-macchiato', name: 'Iced Latte Macchiato', description: 'Chilled milk marked with espresso', price: 4.5, categoryId: COLD, sortOrder: 2, imageFile: 'iced-latte-macchiato.jpg', allergens: 'Milk' },
-  { id: 'menu-iced-spanish-latte', name: 'Iced Spanish Latte', description: 'Iced sweet condensed milk latte', price: 5.0, categoryId: COLD, sortOrder: 3, imageFile: 'iced-spanish-latte.jpg', allergens: 'Milk' },
-  { id: 'menu-iced-chai-latte', name: 'Iced Chai Latte', description: 'Spiced chai over ice', price: 5.0, categoryId: COLD, sortOrder: 4, imageFile: 'iced-chai-latte.jpg', allergens: 'Milk' },
-  { id: 'menu-iced-lavender-latte', name: 'Iced Lavender Latte', description: 'Iced floral lavender latte', price: 5.0, categoryId: COLD, sortOrder: 5, imageFile: 'iced-lavender-latte.jpg', allergens: 'Milk' },
-  { id: 'menu-iced-tea', name: 'Iced Tea', description: 'Chilled brewed tea', price: 3.5, categoryId: COLD, sortOrder: 6, imageFile: 'iced-tea.jpg' },
-  { id: 'menu-juice', name: 'Juice', description: 'Fresh fruit juice', price: 3.0, categoryId: COLD, sortOrder: 7, imageFile: 'juice.jpg' },
-  { id: 'menu-mojito', name: 'Mojito', description: 'Mint lime refresher (non-alcoholic)', price: 4.0, categoryId: COLD, sortOrder: 8, imageFile: 'mojito.jpg' },
+  { id: 'menu-iced-latte', name: 'Iced Latte', description: 'Espresso with chilled milk over ice', price: 4.5, categoryId: COLD, sortOrder: 2, imageFile: 'iced-latte.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-latte-macchiato', name: 'Iced Latte Macchiato', description: 'Chilled milk marked with espresso', price: 4.5, categoryId: COLD, sortOrder: 3, imageFile: 'iced-latte-macchiato.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-spanish-latte', name: 'Iced Spanish Latte', description: 'Iced sweet condensed milk latte', price: 5.0, categoryId: COLD, sortOrder: 4, imageFile: 'iced-spanish-latte.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-chai-latte', name: 'Iced Chai Latte', description: 'Spiced chai over ice', price: 5.0, categoryId: COLD, sortOrder: 5, imageFile: 'iced-chai-latte.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-lavender-latte', name: 'Iced Lavender Latte', description: 'Iced floral lavender latte', price: 5.0, categoryId: COLD, sortOrder: 6, imageFile: 'iced-lavender-latte.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-hazelnut-latte', name: 'Iced Hazelnut Latte', description: 'Iced latte with hazelnut', price: 5.0, categoryId: COLD, sortOrder: 7, imageFile: 'iced-hazelnut-latte.jpg', allergens: 'Milk,Nuts' },
+  { id: 'menu-iced-coconut-vanilla', name: 'Iced Coconut Vanilla', description: 'Iced coconut vanilla latte', price: 5.0, categoryId: COLD, sortOrder: 8, imageFile: 'iced-coconut-vanilla.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-tea', name: 'Iced Tea', description: 'Chilled brewed tea', price: 3.5, categoryId: COLD, sortOrder: 9, imageFile: 'iced-tea.jpg' },
+  { id: 'menu-juice', name: 'Juice', description: 'Fresh fruit juice', price: 3.0, categoryId: COLD, sortOrder: 10, imageFile: 'juice.jpg' },
+  { id: 'menu-mojito', name: 'Mojito', description: 'Mint lime refresher (non-alcoholic)', price: 4.0, categoryId: COLD, sortOrder: 11, imageFile: 'mojito.jpg' },
+  { id: 'menu-mango-mojito', name: 'Mango Mojito', description: 'Mango mint refresher', price: 4.5, categoryId: COLD, sortOrder: 12, imageFile: 'mango-mojito.jpg' },
+  { id: 'menu-strawberry-mojito', name: 'Strawberry Mojito', description: 'Strawberry mint refresher', price: 4.5, categoryId: COLD, sortOrder: 13, imageFile: 'strawberry-mojito.jpg' },
+  { id: 'menu-blue-coconut-mojito', name: 'Blue Coconut Mojito', description: 'Blue coconut mint refresher', price: 4.5, categoryId: COLD, sortOrder: 14, imageFile: 'blue-coconut-mojito.jpg' },
+  { id: 'menu-mango-strawberry-mojito', name: 'Mango Strawberry Mojito', description: 'Mango & strawberry mint refresher', price: 4.8, categoryId: COLD, sortOrder: 15, imageFile: 'mango-strawberry-mojito.jpg' },
 
   // Tea
   { id: 'menu-english-breakfast', name: 'English Breakfast', description: 'Classic black tea', price: 2.0, categoryId: TEA, sortOrder: 1, imageFile: 'english-breakfast.jpg' },
@@ -108,17 +116,20 @@ export const menuProducts: MenuProduct[] = [
   // Matcha
   { id: 'menu-iced-matcha', name: 'Iced Matcha', description: 'Chilled matcha over ice', price: 5.0, categoryId: MATCHA, sortOrder: 1, imageFile: 'iced-matcha.jpg', allergens: 'Milk' },
   { id: 'menu-cloudy-matcha', name: 'Cloudy Matcha', description: 'Creamy cloudy matcha', price: 5.8, categoryId: MATCHA, sortOrder: 2, imageFile: 'cloudy-matcha.jpg', allergens: 'Milk' },
-  { id: 'menu-iced-mango-matcha', name: 'Iced Mango Matcha', description: 'Mango & matcha over ice', price: 5.8, categoryId: MATCHA, sortOrder: 3, imageFile: 'mango-matcha.jpg', allergens: 'Milk' },
-  { id: 'menu-iced-strawberry-matcha', name: 'Iced Strawberry Matcha', description: 'Strawberry & matcha over ice', price: 5.8, categoryId: MATCHA, sortOrder: 4, imageFile: 'strawberry-matcha.jpg', allergens: 'Milk' },
-  { id: 'menu-lavender-matcha', name: 'Lavender Matcha', description: 'Lavender infused matcha', price: 5.8, categoryId: MATCHA, sortOrder: 5, imageFile: 'lavender-matcha.jpg', allergens: 'Milk' },
-  { id: 'menu-dirty-matcha', name: 'Dirty Matcha', description: 'Matcha with espresso', price: 6.0, categoryId: MATCHA, sortOrder: 6, imageFile: 'dirty-matcha.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-cloudy-matcha', name: 'Iced Cloudy Matcha', description: 'Cloudy matcha over ice', price: 5.8, categoryId: MATCHA, sortOrder: 3, imageFile: 'iced-cloudy-matcha.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-mango-matcha', name: 'Iced Mango Matcha', description: 'Mango & matcha over ice', price: 5.8, categoryId: MATCHA, sortOrder: 4, imageFile: 'mango-matcha.jpg', allergens: 'Milk' },
+  { id: 'menu-iced-strawberry-matcha', name: 'Iced Strawberry Matcha', description: 'Strawberry & matcha over ice', price: 5.8, categoryId: MATCHA, sortOrder: 5, imageFile: 'strawberry-matcha.jpg', allergens: 'Milk' },
+  { id: 'menu-lavender-matcha', name: 'Lavender Matcha', description: 'Lavender infused matcha', price: 5.8, categoryId: MATCHA, sortOrder: 6, imageFile: 'lavender-matcha.jpg', allergens: 'Milk' },
+  { id: 'menu-dirty-matcha', name: 'Dirty Matcha', description: 'Matcha with espresso', price: 6.0, categoryId: MATCHA, sortOrder: 8, imageFile: 'dirty-matcha.jpg', allergens: 'Milk' },
 
   // Frappes
   { id: 'menu-caramel-frappe', name: 'Caramel Frappe', description: 'Blended coffee with caramel', price: 6.8, categoryId: FRAPPE, sortOrder: 1, imageFile: 'caramel-frappe.jpg', allergens: 'Milk' },
   { id: 'menu-strawberry-frappe', name: 'Strawberry Frappe', description: 'Blended strawberry frappe', price: 6.8, categoryId: FRAPPE, sortOrder: 2, imageFile: 'strawberry-frappe.jpg', allergens: 'Milk' },
   { id: 'menu-vanilla-frappe', name: 'Vanilla Frappe', description: 'Blended vanilla coffee frappe', price: 6.8, categoryId: FRAPPE, sortOrder: 3, imageFile: 'vanilla-frappe.jpg', allergens: 'Milk' },
   { id: 'menu-cookies-frappe', name: 'Cookies Frappe', description: 'Blended cookies & cream frappe', price: 6.8, categoryId: FRAPPE, sortOrder: 4, imageFile: 'cookies-frappe.jpg', allergens: 'Milk' },
-  { id: 'menu-white-choco-frappe', name: 'White Choco Frappe', description: 'Blended white chocolate frappe', price: 6.8, categoryId: FRAPPE, sortOrder: 5, imageFile: 'white-choco-frappe.jpg', allergens: 'Milk' },
+  { id: 'menu-kinder-bueno-frappe', name: 'Kinder Bueno Frappe', description: 'Blended Kinder Bueno frappe', price: 6.8, categoryId: FRAPPE, sortOrder: 5, imageFile: 'kinder-bueno-frappe.jpg', allergens: 'Milk,Nuts' },
+  { id: 'menu-popcorn-frappe', name: 'Popcorn Frappe', description: 'Blended popcorn frappe', price: 6.8, categoryId: FRAPPE, sortOrder: 6, imageFile: 'popcorn-frappe.jpg', allergens: 'Milk' },
+  { id: 'menu-white-choco-frappe', name: 'White Choco Frappe', description: 'Blended white chocolate frappe', price: 6.8, categoryId: FRAPPE, sortOrder: 7, imageFile: 'white-choco-frappe.jpg', allergens: 'Milk' },
 
   // Milkshakes
   { id: 'menu-vanilla-milkshake', name: 'Vanilla Milkshake', description: 'Classic vanilla shake', price: 5.8, categoryId: SHAKE, sortOrder: 1, imageFile: 'vanilla-milkshake.jpg', allergens: 'Milk' },
@@ -127,4 +138,10 @@ export const menuProducts: MenuProduct[] = [
   { id: 'menu-oreo-milkshake', name: 'Oreo Milkshake', description: 'Cookies & cream shake', price: 6.4, categoryId: SHAKE, sortOrder: 4, imageFile: 'oreo-milkshake.jpg', allergens: 'Milk' },
   { id: 'menu-lotus-milkshake', name: 'Lotus Milkshake', description: 'Biscoff speculoos shake', price: 6.4, categoryId: SHAKE, sortOrder: 5, imageFile: 'lotus-milkshake.jpg', allergens: 'Milk' },
   { id: 'menu-mango-milkshake', name: 'Mango Milkshake', description: 'Tropical mango shake', price: 6.4, categoryId: SHAKE, sortOrder: 6, imageFile: 'mango-milkshake.jpg', allergens: 'Milk' },
+
+  // Protein Drinks (hot/cold — prices aligned with specialty shakes)
+  { id: 'menu-protein-oreo', name: 'Protein Oreo', description: 'High-protein Oreo drink', price: 6.4, categoryId: PROTEIN, sortOrder: 1, imageFile: 'protein-oreo.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-caramel', name: 'Protein Caramel', description: 'High-protein caramel drink', price: 6.4, categoryId: PROTEIN, sortOrder: 2, imageFile: 'protein-caramel.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-biscoff', name: 'Protein Biscoff', description: 'High-protein Biscoff drink', price: 6.4, categoryId: PROTEIN, sortOrder: 3, imageFile: 'protein-biscoff.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-strawberry', name: 'Protein Strawberry', description: 'High-protein strawberry drink', price: 6.4, categoryId: PROTEIN, sortOrder: 4, imageFile: 'protein-strawberry.jpg', allergens: 'Milk' },
 ];
