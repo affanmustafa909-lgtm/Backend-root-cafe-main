@@ -214,6 +214,23 @@ class ProductsController {
       }),
     );
   }
+
+  /** Public sales ranking for Home “most sold first”. */
+  @Get('popular')
+  async popular(@Query('limit') raw?: string) {
+    const take = Math.min(Math.max(Number(raw ?? 100) || 100, 1), 200);
+    const rows = await this.prisma.orderItem.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take,
+    });
+    return rows.map((row) => ({
+      productId: row.productId,
+      quantitySold: row._sum.quantity ?? 0,
+    }));
+  }
+
   @Get(':id')
   async one(@Param('id') id: string) {
     await ensureProductCustomizationDefaults(this.prisma);
