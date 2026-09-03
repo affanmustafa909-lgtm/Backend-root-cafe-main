@@ -64,6 +64,22 @@ export const DEFAULT_CUSTOMIZATION_DEFS: GroupDef[] = [
       { id: 'seed-option-syrup-cinnamon', name: 'Cinnamon', sortOrder: 5, additionalPrice: 0.5 },
     ],
   },
+  {
+    id: 'seed-group-whipped-cream',
+    name: 'Whipped Cream',
+    sortOrder: 13,
+    required: false,
+    selectionType: SelectionType.SINGLE,
+    options: [
+      { id: 'seed-option-no-whipped', name: 'None', sortOrder: 1, additionalPrice: 0 },
+      {
+        id: 'seed-option-whipped',
+        name: 'Add Whipped Cream',
+        sortOrder: 2,
+        additionalPrice: 0.5,
+      },
+    ],
+  },
 ];
 
 export const TEMPERATURE_GROUP: GroupDef = {
@@ -220,7 +236,7 @@ export async function linkDefaultCustomizationsToAllProducts(
 
 let defaultsReady: Promise<void> | null = null;
 
-/** Idempotent — every product gets Size / Milk / Syrups (+ Temperature for matcha & protein). */
+/** Idempotent — every product gets Size / Milk / Syrups / Whipped Cream (+ Temperature for matcha & protein). */
 export function ensureProductCustomizationDefaults(prisma: PrismaService) {
   if (!defaultsReady) {
     defaultsReady = (async () => {

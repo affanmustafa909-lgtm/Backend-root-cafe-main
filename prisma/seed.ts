@@ -7,7 +7,33 @@ import {
   SelectionType,
 } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { menuCategories, menuProducts } from './menu-catalog.js';
+
+function loadDotEnv() {
+  try {
+    const text = readFileSync(resolve(process.cwd(), '.env'), 'utf8');
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq < 1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] === undefined) process.env[key] = val;
+    }
+  } catch {
+    // .env optional when vars are already in the environment
+  }
+}
+loadDotEnv();
 
 const prisma = new PrismaClient();
 const password = process.env.SEED_PASSWORD;
@@ -180,6 +206,38 @@ await prisma.customizationOption.upsert({
     sortOrder: 1,
   },
 });
+
+// Whipped Cream — available on ALL drinks for €0.50
+const whippedCream = await prisma.customizationGroup.upsert({
+  where: { id: 'seed-group-whipped-cream' },
+  update: { name: 'Whipped Cream', isActive: true },
+  create: {
+    id: 'seed-group-whipped-cream',
+    name: 'Whipped Cream',
+    selectionType: SelectionType.SINGLE,
+    isRequired: false,
+    sortOrder: 3,
+  },
+});
+await prisma.customizationOption.upsert({
+  where: { id: 'seed-option-no-whipped' },
+  update: { name: 'None', additionalPrice: 0 },
+  create: { id: 'seed-option-no-whipped', groupId: whippedCream.id, name: 'None', additionalPrice: 0, sortOrder: 1 },
+});
+await prisma.customizationOption.upsert({
+  where: { id: 'seed-option-whipped' },
+  update: { name: 'Add Whipped Cream', additionalPrice: 0.50 },
+  create: { id: 'seed-option-whipped', groupId: whippedCream.id, name: 'Add Whipped Cream', additionalPrice: 0.50, sortOrder: 2 },
+});
+
+// Attach whipped cream to ALL drinks
+for (const product of products) {
+  await prisma.productCustomizationGroup.upsert({
+    where: { productId_groupId: { productId: product.id, groupId: whippedCream.id } },
+    update: { sortOrder: 3 },
+    create: { productId: product.id, groupId: whippedCream.id, sortOrder: 3 },
+  });
+}
 
 const milkProducts = [latte, matchaLatte, cappuccino, icedLatteMacchiato, chai];
 for (const product of milkProducts) {
@@ -356,8 +414,20 @@ await prisma.appConfig.upsert({
 
 const onboardingSlides = [
   {
-    id: 'seed-onboarding-1',
+    id: 'seed-onboarding-cafe',
     sortOrder: 1,
+    imageUrl: '/uploads/onboarding/cafe-snow.jpg',
+    title: 'Welcome to Roots Café',
+    body: 'Your neighbourhood café — come in from the cold for specialty coffee.',
+    titlePlacement: 'bottom',
+    titleAlign: 'center',
+    bodyAlign: 'center',
+    copyBlockVertical: 'bottom',
+    showBottomShadow: true,
+  },
+  {
+    id: 'seed-onboarding-1',
+    sortOrder: 2,
     imageUrl: '/uploads/onboarding/slide-1.png',
     title: 'Enjoy quality brew with the finest of flavours',
     body: 'The best of its kind you can ever get with exquisite taste and quality flavors.',
@@ -369,7 +439,7 @@ const onboardingSlides = [
   },
   {
     id: 'seed-onboarding-2',
-    sortOrder: 2,
+    sortOrder: 3,
     imageUrl: '/uploads/onboarding/slide-2.png',
     title: 'Experience the Joy of Coffee in Every Blissful Sip!',
     body: 'Indulge in rich aromas and smooth flavors crafted for true coffee lovers.',

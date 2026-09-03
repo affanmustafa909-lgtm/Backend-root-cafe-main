@@ -33,39 +33,46 @@ export const menuCategories: MenuCategory[] = [
     sortOrder: 2,
   },
   {
+    id: 'menu-cat-mojito',
+    name: 'Mojitos',
+    description: 'Non-alcoholic mint lime refreshers',
+    sortOrder: 3,
+  },
+  {
     id: 'menu-cat-tea',
     name: 'Tea',
     description: 'Hot brewed teas',
-    sortOrder: 3,
+    sortOrder: 4,
   },
   {
     id: 'menu-cat-matcha',
     name: 'Matcha',
     description: 'Ceremonial grade matcha drinks',
-    sortOrder: 4,
+    sortOrder: 5,
   },
   {
     id: 'menu-cat-frappe',
     name: 'Frappes',
     description: 'Blended iced coffee treats',
-    sortOrder: 5,
+    sortOrder: 6,
   },
   {
     id: 'menu-cat-milkshake',
     name: 'Milkshakes',
     description: 'Thick, creamy shakes',
-    sortOrder: 6,
+    sortOrder: 7,
   },
   {
     id: 'menu-cat-protein',
     name: 'Protein Drinks',
     description: 'High-protein shakes — hot or iced',
-    sortOrder: 7,
+    sortOrder: 8,
   },
 ];
 
 const HOT = 'menu-cat-hot';
 const COLD = 'menu-cat-cold';
+const MOJITO = 'menu-cat-mojito';
 const TEA = 'menu-cat-tea';
 const MATCHA = 'menu-cat-matcha';
 const FRAPPE = 'menu-cat-frappe';
@@ -102,11 +109,12 @@ export const menuProducts: MenuProduct[] = [
   { id: 'menu-iced-coconut-vanilla', name: 'Iced Coconut Vanilla', description: 'Iced coconut vanilla latte', price: 5.0, categoryId: COLD, sortOrder: 8, imageFile: 'iced-coconut-vanilla.jpg', allergens: 'Milk' },
   { id: 'menu-iced-tea', name: 'Iced Tea', description: 'Chilled brewed tea', price: 3.5, categoryId: COLD, sortOrder: 9, imageFile: 'iced-tea.jpg' },
   { id: 'menu-juice', name: 'Juice', description: 'Fresh fruit juice', price: 3.0, categoryId: COLD, sortOrder: 10, imageFile: 'juice.jpg' },
-  { id: 'menu-mojito', name: 'Mojito', description: 'Mint lime refresher (non-alcoholic)', price: 4.0, categoryId: COLD, sortOrder: 11, imageFile: 'mojito.jpg' },
-  { id: 'menu-mango-mojito', name: 'Mango Mojito', description: 'Mango mint refresher', price: 4.5, categoryId: COLD, sortOrder: 12, imageFile: 'mango-mojito.jpg' },
-  { id: 'menu-strawberry-mojito', name: 'Strawberry Mojito', description: 'Strawberry mint refresher', price: 4.5, categoryId: COLD, sortOrder: 13, imageFile: 'strawberry-mojito.jpg' },
-  { id: 'menu-blue-coconut-mojito', name: 'Blue Coconut Mojito', description: 'Blue coconut mint refresher', price: 4.5, categoryId: COLD, sortOrder: 14, imageFile: 'blue-coconut-mojito.jpg' },
-  { id: 'menu-mango-strawberry-mojito', name: 'Mango Strawberry Mojito', description: 'Mango & strawberry mint refresher', price: 4.8, categoryId: COLD, sortOrder: 15, imageFile: 'mango-strawberry-mojito.jpg' },
+  // Mojitos (own category)
+  { id: 'menu-mojito', name: 'Mojito', description: 'Mint lime refresher (non-alcoholic)', price: 4.0, categoryId: MOJITO, sortOrder: 1, imageFile: 'mojito.jpg' },
+  { id: 'menu-mango-mojito', name: 'Mango Mojito', description: 'Mango mint refresher', price: 4.5, categoryId: MOJITO, sortOrder: 2, imageFile: 'mango-mojito.jpg' },
+  { id: 'menu-strawberry-mojito', name: 'Strawberry Mojito', description: 'Strawberry mint refresher', price: 4.5, categoryId: MOJITO, sortOrder: 3, imageFile: 'strawberry-mojito.jpg' },
+  { id: 'menu-blue-coconut-mojito', name: 'Blue Coconut Mojito', description: 'Blue coconut mint refresher', price: 4.5, categoryId: MOJITO, sortOrder: 4, imageFile: 'blue-coconut-mojito.jpg' },
+  { id: 'menu-mango-strawberry-mojito', name: 'Mango Strawberry Mojito', description: 'Mango & strawberry mint refresher', price: 4.8, categoryId: MOJITO, sortOrder: 5, imageFile: 'mango-strawberry-mojito.jpg' },
 
   // Tea
   { id: 'menu-english-breakfast', name: 'English Breakfast', description: 'Classic black tea', price: 2.0, categoryId: TEA, sortOrder: 1, imageFile: 'english-breakfast.jpg' },
@@ -140,8 +148,8 @@ export const menuProducts: MenuProduct[] = [
   { id: 'menu-mango-milkshake', name: 'Mango Milkshake', description: 'Tropical mango shake', price: 6.4, categoryId: SHAKE, sortOrder: 6, imageFile: 'mango-milkshake.jpg', allergens: 'Milk' },
 
   // Protein Drinks (hot/cold — prices aligned with specialty shakes)
-  { id: 'menu-protein-oreo', name: 'Protein Oreo', description: 'High-protein Oreo drink', price: 6.4, categoryId: PROTEIN, sortOrder: 1, imageFile: 'protein-oreo.jpg', allergens: 'Milk' },
-  { id: 'menu-protein-caramel', name: 'Protein Caramel', description: 'High-protein caramel drink', price: 6.4, categoryId: PROTEIN, sortOrder: 2, imageFile: 'protein-caramel.jpg', allergens: 'Milk' },
-  { id: 'menu-protein-biscoff', name: 'Protein Biscoff', description: 'High-protein Biscoff drink', price: 6.4, categoryId: PROTEIN, sortOrder: 3, imageFile: 'protein-biscoff.jpg', allergens: 'Milk' },
-  { id: 'menu-protein-strawberry', name: 'Protein Strawberry', description: 'High-protein strawberry drink', price: 6.4, categoryId: PROTEIN, sortOrder: 4, imageFile: 'protein-strawberry.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-oreo', name: 'Protein Oreo', description: 'High-protein Oreo drink', price: 6.4, categoryId: PROTEIN, sortOrder: 1, imageFile: 'protein-oreo-cold.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-caramel', name: 'Protein Caramel', description: 'High-protein caramel drink', price: 6.4, categoryId: PROTEIN, sortOrder: 2, imageFile: 'protein-caramel-cold.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-biscoff', name: 'Protein Biscoff', description: 'High-protein Biscoff drink', price: 6.4, categoryId: PROTEIN, sortOrder: 3, imageFile: 'protein-biscoff-cold.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-strawberry', name: 'Protein Strawberry', description: 'High-protein strawberry drink', price: 6.4, categoryId: PROTEIN, sortOrder: 4, imageFile: 'protein-strawberry-cold.jpg', allergens: 'Milk' },
 ];
