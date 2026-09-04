@@ -260,7 +260,12 @@ class AdminProductsController {
 
   @Get()
   async list() {
-    return serialize(await this.prisma.product.findMany({ include }));
+    return serialize(
+      await this.prisma.product.findMany({
+        include,
+        orderBy: [{ createdAt: 'desc' }, { sortOrder: 'asc' }],
+      }),
+    );
   }
 
   @Get(':id')
