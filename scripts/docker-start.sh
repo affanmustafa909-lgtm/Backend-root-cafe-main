@@ -46,5 +46,8 @@ else
   echo "$DEPLOY_OUT"
 fi
 
+echo "Restoring catalog product images from /uploads/menu…"
+node --experimental-strip-types scripts/restore-menu-images.ts || true
+
 echo "Starting API…"
 exec node dist/main.js
