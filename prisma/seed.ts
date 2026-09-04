@@ -226,8 +226,8 @@ await prisma.customizationOption.upsert({
 });
 await prisma.customizationOption.upsert({
   where: { id: 'seed-option-whipped' },
-  update: { name: 'Add Whipped Cream', additionalPrice: 0.50 },
-  create: { id: 'seed-option-whipped', groupId: whippedCream.id, name: 'Add Whipped Cream', additionalPrice: 0.50, sortOrder: 2 },
+  update: { name: 'Whipped Cream', additionalPrice: 0.50 },
+  create: { id: 'seed-option-whipped', groupId: whippedCream.id, name: 'Whipped Cream', additionalPrice: 0.50, sortOrder: 2 },
 });
 
 // Attach whipped cream to ALL drinks

@@ -74,7 +74,7 @@ export const DEFAULT_CUSTOMIZATION_DEFS: GroupDef[] = [
       { id: 'seed-option-no-whipped', name: 'None', sortOrder: 1, additionalPrice: 0 },
       {
         id: 'seed-option-whipped',
-        name: 'Add Whipped Cream',
+        name: 'Whipped Cream',
         sortOrder: 2,
         additionalPrice: 0.5,
       },
