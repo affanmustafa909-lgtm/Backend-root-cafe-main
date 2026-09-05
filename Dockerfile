@@ -19,6 +19,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/uploads ./uploads
 COPY scripts/docker-start.sh ./scripts/docker-start.sh
 COPY scripts/restore-menu-images.ts ./scripts/restore-menu-images.ts
+COPY scripts/hydrate-runtime-images.ts ./scripts/hydrate-runtime-images.ts
 COPY prisma/menu-catalog.ts ./prisma/menu-catalog.ts
 RUN chmod +x ./scripts/docker-start.sh
 EXPOSE 3000

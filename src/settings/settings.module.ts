@@ -37,6 +37,7 @@ import {
 } from '../realtime/realtime.module.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
 import { toStoredImageUrl } from '../uploads/durable-image.js';
+import { publicMediaUrl } from '../uploads/materialize.js';
 import { PickupSettingsService } from './pickup-settings.service.js';
 import {
   StampCardModule,
@@ -171,8 +172,12 @@ class SettingsController {
       create: { id: BANNER_ID },
       update: {},
     });
+    const homeBannerImageUrl = await publicMediaUrl(
+      row.homeBannerImageUrl,
+      `banner:${row.id}`,
+    );
     return {
-      homeBannerImageUrl: row.homeBannerImageUrl,
+      homeBannerImageUrl: homeBannerImageUrl ?? row.homeBannerImageUrl,
       recommendedSize: {
         width: 1200,
         height: 576,
@@ -197,12 +202,16 @@ class SettingsController {
       create: { id: BANNER_ID, ...data },
       update: data,
     });
+    const homeBannerImageUrl = await publicMediaUrl(
+      row.homeBannerImageUrl,
+      `banner:${row.id}`,
+    );
     this.realtime.emitMenu('menu.updated', {
       type: 'home-banner',
-      homeBannerImageUrl: row.homeBannerImageUrl,
+      homeBannerImageUrl: homeBannerImageUrl ?? row.homeBannerImageUrl,
     });
     return {
-      homeBannerImageUrl: row.homeBannerImageUrl,
+      homeBannerImageUrl: homeBannerImageUrl ?? row.homeBannerImageUrl,
       updatedAt: row.updatedAt,
     };
   }
@@ -254,11 +263,16 @@ class PublicSettingsController {
     const appConfig = await this.prisma.appConfig.findUnique({
       where: { id: BANNER_ID },
     });
+    const homeBannerImageUrl = await publicMediaUrl(
+      appConfig?.homeBannerImageUrl,
+      `banner:${appConfig?.id ?? BANNER_ID}`,
+    );
     return {
       currency: this.config.get<string>('currency'),
       taxRate: this.config.get<number>('taxRate'),
       timezone: this.config.get<string>('timezone'),
-      homeBannerImageUrl: appConfig?.homeBannerImageUrl ?? null,
+      homeBannerImageUrl:
+        homeBannerImageUrl ?? appConfig?.homeBannerImageUrl ?? null,
       stampCard: {
         enabled: stamp.enabled,
         stampsRequired: stamp.stampsRequired,

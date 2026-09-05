@@ -331,8 +331,10 @@ class AdminProductsController {
       where: { id: product.id },
       include,
     });
-    await this.broadcast();
-    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
+    await this.broadcast(withGroups);
+    return withPublicImage(
+      serialize(withGroups) as { id: string; imageUrl?: string | null },
+    );
   }
 
   @Roles(...AdminRoles)
@@ -352,8 +354,10 @@ class AdminProductsController {
       data,
       include,
     });
-    await this.broadcast();
-    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
+    await this.broadcast(product);
+    return withPublicImage(
+      serialize(product) as { id: string; imageUrl?: string | null },
+    );
   }
 
   @Roles(...AdminRoles)
@@ -364,8 +368,10 @@ class AdminProductsController {
       data: { isActive: false, isAvailable: false, isSoldOut: false },
       include,
     });
-    await this.broadcast();
-    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
+    await this.broadcast(product);
+    return withPublicImage(
+      serialize(product) as { id: string; imageUrl?: string | null },
+    );
   }
 
   @Roles(...AdminRoles)
@@ -383,8 +389,10 @@ class AdminProductsController {
       },
       include,
     });
-    await this.broadcast();
-    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
+    await this.broadcast(product);
+    return withPublicImage(
+      serialize(product) as { id: string; imageUrl?: string | null },
+    );
   }
 
   @Roles(...ManagerRoles)
@@ -410,8 +418,10 @@ class AdminProductsController {
       data: { imageUrl: await toStoredImageUrl(file) },
       include,
     });
-    await this.broadcast();
-    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
+    await this.broadcast(product);
+    return withPublicImage(
+      serialize(product) as { id: string; imageUrl?: string | null },
+    );
   }
 }
 

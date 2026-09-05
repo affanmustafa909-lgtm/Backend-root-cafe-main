@@ -25,6 +25,7 @@ import { serialize } from '../common/serialization.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
 import { toStoredImageUrl } from '../uploads/durable-image.js';
+import { publicMediaUrl } from '../uploads/materialize.js';
 
 const APP_ID = 'default';
 
@@ -92,8 +93,16 @@ class PublicOnboardingController {
       }),
       this.prisma.appConfig.findUnique({ where: { id: APP_ID } }),
     ]);
+    const publicSlides = await Promise.all(
+      slides.map(async (slide) => ({
+        ...slide,
+        imageUrl:
+          (await publicMediaUrl(slide.imageUrl, `onboarding:${slide.id}`)) ??
+          slide.imageUrl,
+      })),
+    );
     return serialize({
-      slides,
+      slides: publicSlides,
       ctaText: config?.onboardingCtaText ?? 'Get Started',
       recommendedSize: RECOMMENDED_SIZE,
     });
@@ -111,8 +120,16 @@ class AdminOnboardingController {
       this.prisma.onboardingSlide.findMany({ orderBy: { sortOrder: 'asc' } }),
       this.prisma.appConfig.findUnique({ where: { id: APP_ID } }),
     ]);
+    const publicSlides = await Promise.all(
+      slides.map(async (slide) => ({
+        ...slide,
+        imageUrl:
+          (await publicMediaUrl(slide.imageUrl, `onboarding:${slide.id}`)) ??
+          slide.imageUrl,
+      })),
+    );
     return serialize({
-      slides,
+      slides: publicSlides,
       ctaText: config?.onboardingCtaText ?? 'Get Started',
       recommendedSize: RECOMMENDED_SIZE,
     });

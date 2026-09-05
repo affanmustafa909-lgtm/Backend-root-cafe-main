@@ -49,5 +49,8 @@ fi
 echo "Restoring catalog product images from /uploads/menu…"
 node --experimental-strip-types scripts/restore-menu-images.ts || true
 
+echo "Hydrating durable admin uploads into /uploads/runtime…"
+npx tsx scripts/hydrate-runtime-images.ts || true
+
 echo "Starting API…"
 exec node dist/main.js
