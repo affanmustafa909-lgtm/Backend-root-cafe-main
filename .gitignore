@@ -24,6 +24,8 @@ uploads/*
 !uploads/menu/**
 !uploads/onboarding/
 !uploads/onboarding/**
+!uploads/runtime/
+!uploads/runtime/**
 
 # IDE
 .idea
