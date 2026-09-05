@@ -36,6 +36,7 @@ import {
   RealtimeService,
 } from '../realtime/realtime.module.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
+import { toStoredImageUrl } from '../uploads/durable-image.js';
 import { PickupSettingsService } from './pickup-settings.service.js';
 import {
   StampCardModule,
@@ -189,7 +190,7 @@ class SettingsController {
   @UseInterceptors(bannerUpload)
   async updateHomeBanner(@UploadedFile() file?: Express.Multer.File) {
     const data = file
-      ? { homeBannerImageUrl: `/uploads/${file.filename}` }
+      ? { homeBannerImageUrl: await toStoredImageUrl(file) }
       : {};
     const row = await this.prisma.appConfig.upsert({
       where: { id: BANNER_ID },

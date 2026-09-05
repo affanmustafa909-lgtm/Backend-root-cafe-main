@@ -35,6 +35,7 @@ import { CurrentUser, Public, Roles } from '../common/auth.js';
 import type { JwtUser } from '../common/auth.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
+import { toStoredImageUrl } from '../uploads/durable-image.js';
 
 export class RegisterDto {
   @IsEmail() email: string;
@@ -181,7 +182,7 @@ class AuthService {
     if (!file) throw new HttpException('Image required', HttpStatus.BAD_REQUEST);
     const account = await this.prisma.user.update({
       where: { id: user.id },
-      data: { avatarUrl: `/uploads/${file.filename}` },
+      data: { avatarUrl: await toStoredImageUrl(file) },
       select: userPublicSelect,
     });
     return {

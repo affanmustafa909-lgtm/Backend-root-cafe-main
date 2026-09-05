@@ -33,6 +33,7 @@ import {
   RealtimeService,
 } from '../realtime/realtime.module.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
+import { toStoredImageUrl } from '../uploads/durable-image.js';
 import {
   ensureProductCustomizationDefaults,
   linkDefaultCustomizationsToProduct,
@@ -175,7 +176,7 @@ function toProductData(
               : null,
         }
       : {}),
-    ...(file ? { imageUrl: `/uploads/${file.filename}` } : {}),
+    // imageUrl is applied asynchronously via toStoredImageUrl in controllers
   };
 }
 class AvailabilityDto {
@@ -286,6 +287,9 @@ class AdminProductsController {
       dto,
       file,
     ) as Prisma.ProductUncheckedCreateInput;
+    if (file) {
+      data.imageUrl = await toStoredImageUrl(file);
+    }
     // New products must appear on the customer menu unless explicitly inactive
     if (data.isActive === undefined) data.isActive = true;
     if (data.isAvailable === undefined) data.isAvailable = true;
@@ -319,9 +323,13 @@ class AdminProductsController {
     @Body() dto: UpdateProductDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    const data = toProductData(dto, file) as Prisma.ProductUncheckedUpdateInput;
+    if (file) {
+      data.imageUrl = await toStoredImageUrl(file);
+    }
     const product = await this.prisma.product.update({
       where: { id },
-      data: toProductData(dto, file),
+      data,
       include,
     });
     this.broadcast(product);
@@ -379,7 +387,7 @@ class AdminProductsController {
   ) {
     const product = await this.prisma.product.update({
       where: { id },
-      data: { imageUrl: `/uploads/${file.filename}` },
+      data: { imageUrl: await toStoredImageUrl(file) },
       include,
     });
     this.broadcast(product);

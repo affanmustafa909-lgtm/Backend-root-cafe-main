@@ -24,6 +24,7 @@ import { AdminRoles, ManagerRoles, Public, Roles } from '../common/auth.js';
 import { serialize } from '../common/serialization.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
+import { toStoredImageUrl } from '../uploads/durable-image.js';
 
 const APP_ID = 'default';
 
@@ -154,7 +155,7 @@ class AdminOnboardingController {
           copyBlockVertical: dto.copyBlockVertical ?? 'bottom',
           showBottomShadow: dto.showBottomShadow ?? false,
           sortOrder: dto.sortOrder ?? (maxOrder._max.sortOrder ?? 0) + 1,
-          imageUrl: file ? `/uploads/${file.filename}` : null,
+          imageUrl: file ? await toStoredImageUrl(file) : null,
         },
       }),
     );
@@ -173,7 +174,7 @@ class AdminOnboardingController {
         where: { id },
         data: {
           ...dto,
-          ...(file ? { imageUrl: `/uploads/${file.filename}` } : {}),
+          ...(file ? { imageUrl: await toStoredImageUrl(file) } : {}),
         },
       }),
     );
