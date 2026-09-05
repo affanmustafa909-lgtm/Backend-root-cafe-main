@@ -34,6 +34,7 @@ import {
 } from '../realtime/realtime.module.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
 import { toStoredImageUrl } from '../uploads/durable-image.js';
+import { publicMediaUrl } from '../uploads/materialize.js';
 import {
   ensureProductCustomizationDefaults,
   linkDefaultCustomizationsToProduct,
@@ -200,6 +201,19 @@ const include = {
   },
 };
 
+async function withPublicImage<T extends { id: string; imageUrl?: string | null }>(
+  product: T,
+): Promise<T> {
+  const imageUrl = await publicMediaUrl(product.imageUrl, `product:${product.id}`);
+  return { ...product, imageUrl: imageUrl ?? null };
+}
+
+async function withPublicImages<T extends { id: string; imageUrl?: string | null }>(
+  products: T[],
+): Promise<T[]> {
+  return Promise.all(products.map((p) => withPublicImage(p)));
+}
+
 @Public()
 @Controller('products')
 class ProductsController {
@@ -207,13 +221,14 @@ class ProductsController {
   @Get()
   async list(@Query('categoryId') categoryId?: string) {
     await ensureProductCustomizationDefaults(this.prisma);
-    return serialize(
+    const rows = serialize(
       await this.prisma.product.findMany({
         where: { isActive: true, ...(categoryId && { categoryId }) },
         include,
         orderBy: [{ createdAt: 'desc' }, { sortOrder: 'asc' }],
       }),
-    );
+    ) as Array<{ id: string; imageUrl?: string | null }>;
+    return withPublicImages(rows);
   }
 
   /** Public sales ranking for Home “most sold first”. */
@@ -236,12 +251,13 @@ class ProductsController {
   async one(@Param('id') id: string) {
     await ensureProductCustomizationDefaults(this.prisma);
     await linkDefaultCustomizationsToProduct(this.prisma, id);
-    return serialize(
+    const row = serialize(
       await this.prisma.product.findFirstOrThrow({
         where: { id, isActive: true },
         include,
       }),
-    );
+    ) as { id: string; imageUrl?: string | null };
+    return withPublicImage(row);
   }
 }
 
@@ -253,27 +269,31 @@ class AdminProductsController {
     private readonly realtime: RealtimeService,
   ) {}
 
-  private broadcast(product: unknown) {
-    const payload = serialize(product);
+  private async broadcast(product: { id: string; imageUrl?: string | null }) {
+    const payload = await withPublicImage(
+      serialize(product) as { id: string; imageUrl?: string | null },
+    );
     this.realtime.emitMenu('product.availability_changed', payload);
     this.realtime.emitMenu('menu.updated', { type: 'product', payload });
   }
 
   @Get()
   async list() {
-    return serialize(
+    const rows = serialize(
       await this.prisma.product.findMany({
         include,
         orderBy: [{ createdAt: 'desc' }, { sortOrder: 'asc' }],
       }),
-    );
+    ) as Array<{ id: string; imageUrl?: string | null }>;
+    return withPublicImages(rows);
   }
 
   @Get(':id')
   async one(@Param('id') id: string) {
-    return serialize(
+    const row = serialize(
       await this.prisma.product.findFirstOrThrow({ where: { id }, include }),
-    );
+    ) as { id: string; imageUrl?: string | null };
+    return withPublicImage(row);
   }
 
   @Roles(...ManagerRoles)
@@ -311,8 +331,8 @@ class AdminProductsController {
       where: { id: product.id },
       include,
     });
-    this.broadcast(withGroups);
-    return serialize(withGroups);
+    await this.broadcast();
+    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
   }
 
   @Roles(...AdminRoles)
@@ -332,8 +352,8 @@ class AdminProductsController {
       data,
       include,
     });
-    this.broadcast(product);
-    return serialize(product);
+    await this.broadcast();
+    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
   }
 
   @Roles(...AdminRoles)
@@ -344,8 +364,8 @@ class AdminProductsController {
       data: { isActive: false, isAvailable: false, isSoldOut: false },
       include,
     });
-    this.broadcast(product);
-    return serialize(product);
+    await this.broadcast();
+    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
   }
 
   @Roles(...AdminRoles)
@@ -363,8 +383,8 @@ class AdminProductsController {
       },
       include,
     });
-    this.broadcast(product);
-    return serialize(product);
+    await this.broadcast();
+    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
   }
 
   @Roles(...ManagerRoles)
@@ -390,8 +410,8 @@ class AdminProductsController {
       data: { imageUrl: await toStoredImageUrl(file) },
       include,
     });
-    this.broadcast(product);
-    return serialize(product);
+    await this.broadcast();
+    return withPublicImage(serialize() as { id: string; imageUrl?: string | null });
   }
 }
 
