@@ -17,6 +17,9 @@ export type MenuProduct = {
   allergens?: string;
   /** filename under uploads/menu/ — only set when a unique photo exists */
   imageFile?: string;
+  /** Optional hot / cold variation photos (protein drinks, etc.) */
+  imageFileHot?: string;
+  imageFileCold?: string;
 };
 
 export const menuCategories: MenuCategory[] = [
@@ -148,8 +151,8 @@ export const menuProducts: MenuProduct[] = [
   { id: 'menu-mango-milkshake', name: 'Mango Milkshake', description: 'Tropical mango shake', price: 6.4, categoryId: SHAKE, sortOrder: 6, imageFile: 'mango-milkshake.jpg', allergens: 'Milk' },
 
   // Protein Drinks (hot/cold — prices aligned with specialty shakes)
-  { id: 'menu-protein-oreo', name: 'Protein Oreo', description: 'High-protein Oreo drink', price: 6.4, categoryId: PROTEIN, sortOrder: 1, imageFile: 'protein-oreo-cold.jpg', allergens: 'Milk' },
-  { id: 'menu-protein-caramel', name: 'Protein Caramel', description: 'High-protein caramel drink', price: 6.4, categoryId: PROTEIN, sortOrder: 2, imageFile: 'protein-caramel-cold.jpg', allergens: 'Milk' },
-  { id: 'menu-protein-biscoff', name: 'Protein Biscoff', description: 'High-protein Biscoff drink', price: 6.4, categoryId: PROTEIN, sortOrder: 3, imageFile: 'protein-biscoff-cold.jpg', allergens: 'Milk' },
-  { id: 'menu-protein-strawberry', name: 'Protein Strawberry', description: 'High-protein strawberry drink', price: 6.4, categoryId: PROTEIN, sortOrder: 4, imageFile: 'protein-strawberry-cold.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-oreo', name: 'Protein Oreo', description: 'High-protein Oreo drink', price: 6.4, categoryId: PROTEIN, sortOrder: 1, imageFile: 'protein-oreo-cold.jpg', imageFileHot: 'protein-oreo.jpg', imageFileCold: 'protein-oreo-cold.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-caramel', name: 'Protein Caramel', description: 'High-protein caramel drink', price: 6.4, categoryId: PROTEIN, sortOrder: 2, imageFile: 'protein-caramel-cold.jpg', imageFileHot: 'protein-caramel.jpg', imageFileCold: 'protein-caramel-cold.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-biscoff', name: 'Protein Biscoff', description: 'High-protein Biscoff drink', price: 6.4, categoryId: PROTEIN, sortOrder: 3, imageFile: 'protein-biscoff-cold.jpg', imageFileHot: 'protein-biscoff.jpg', imageFileCold: 'protein-biscoff-cold.jpg', allergens: 'Milk' },
+  { id: 'menu-protein-strawberry', name: 'Protein Strawberry', description: 'High-protein strawberry drink', price: 6.4, categoryId: PROTEIN, sortOrder: 4, imageFile: 'protein-strawberry-cold.jpg', imageFileHot: 'protein-strawberry.jpg', imageFileCold: 'protein-strawberry-cold.jpg', allergens: 'Milk' },
 ];

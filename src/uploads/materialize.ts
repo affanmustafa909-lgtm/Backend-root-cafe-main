@@ -28,7 +28,8 @@ export async function materializeDataImage(
   const mime = match[1];
   const b64 = match[2];
   const ext = extForMime(mime);
-  const hash = createHash('sha1').update(key).digest('hex').slice(0, 16);
+  // Content hash so re-uploads for the same product get a new URL (no stale cache).
+  const hash = createHash('sha1').update(b64).digest('hex').slice(0, 20);
   const filename = `${hash}${ext}`;
   const dir = runtimeDir();
   await mkdir(dir, { recursive: true });
@@ -38,6 +39,7 @@ export async function materializeDataImage(
   } catch {
     await writeFile(full, Buffer.from(b64, 'base64'));
   }
+  void key;
   return `/uploads/runtime/${filename}`;
 }
 

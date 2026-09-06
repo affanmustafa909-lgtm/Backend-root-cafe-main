@@ -10,9 +10,13 @@ import {
   Post,
   Query,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  FileFieldsInterceptor,
+  FileInterceptor,
+} from '@nestjs/platform-express';
 import { Prisma } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -130,15 +134,27 @@ class UpdateProductDto {
   compareAtPrice?: number | null;
 }
 
-const imageUpload = FileInterceptor('image', {
-  storage: imageStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: 5_000_000 },
-});
+type ProductImageFiles = {
+  image?: Express.Multer.File[];
+  imageHot?: Express.Multer.File[];
+  imageCold?: Express.Multer.File[];
+};
+
+const productImagesUpload = FileFieldsInterceptor(
+  [
+    { name: 'image', maxCount: 1 },
+    { name: 'imageHot', maxCount: 1 },
+    { name: 'imageCold', maxCount: 1 },
+  ],
+  {
+    storage: imageStorage,
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 5_000_000 },
+  },
+);
 
 function toProductData(
   dto: Partial<ProductDto> | UpdateProductDto,
-  file?: Express.Multer.File,
 ): Prisma.ProductUncheckedCreateInput | Prisma.ProductUncheckedUpdateInput {
   const isSoldOut = asBool(dto.isSoldOut ?? dto.soldOut);
   const isActive = asBool(dto.isActive ?? dto.active);
@@ -176,9 +192,9 @@ function toProductData(
               : null,
         }
       : {}),
-    // imageUrl is applied asynchronously via toStoredImageUrl in controllers
   };
 }
+
 class AvailabilityDto {
   @IsOptional() @Transform(toBool) @IsBoolean() isAvailable?: boolean;
   @IsOptional() @Transform(toBool) @IsBoolean() isSoldOut?: boolean;
@@ -224,17 +240,43 @@ const listInclude = {
   category: true,
 };
 
-async function withPublicImage<T extends { id: string; imageUrl?: string | null }>(
-  product: T,
-): Promise<T> {
-  const imageUrl = await publicMediaUrl(product.imageUrl, `product:${product.id}`);
-  return { ...product, imageUrl: imageUrl ?? null };
+type ProductMedia = {
+  id: string;
+  imageUrl?: string | null;
+  imageUrlHot?: string | null;
+  imageUrlCold?: string | null;
+};
+
+async function withPublicImage<T extends ProductMedia>(product: T): Promise<T> {
+  const [imageUrl, imageUrlHot, imageUrlCold] = await Promise.all([
+    publicMediaUrl(product.imageUrl, `product:${product.id}`),
+    publicMediaUrl(product.imageUrlHot, `product-hot:${product.id}`),
+    publicMediaUrl(product.imageUrlCold, `product-cold:${product.id}`),
+  ]);
+  return {
+    ...product,
+    imageUrl: imageUrl ?? null,
+    imageUrlHot: imageUrlHot ?? null,
+    imageUrlCold: imageUrlCold ?? null,
+  };
 }
 
-async function withPublicImages<T extends { id: string; imageUrl?: string | null }>(
+async function withPublicImages<T extends ProductMedia>(
   products: T[],
 ): Promise<T[]> {
   return Promise.all(products.map((p) => withPublicImage(p)));
+}
+
+async function applyImageFiles(
+  data: Prisma.ProductUncheckedCreateInput | Prisma.ProductUncheckedUpdateInput,
+  files?: ProductImageFiles,
+) {
+  const main = files?.image?.[0];
+  const hot = files?.imageHot?.[0];
+  const cold = files?.imageCold?.[0];
+  if (main) data.imageUrl = await toStoredImageUrl(main);
+  if (hot) data.imageUrlHot = await toStoredImageUrl(hot);
+  if (cold) data.imageUrlCold = await toStoredImageUrl(cold);
 }
 
 @Public()
@@ -243,7 +285,6 @@ class ProductsController {
   constructor(private readonly prisma: PrismaService) {}
   @Get()
   async list(@Query('categoryId') categoryId?: string) {
-    // Catalog seed is cheap; do not block list on per-product linking
     void ensureProductCustomizationDefaults(this.prisma);
     const rows = serialize(
       await this.prisma.product.findMany({
@@ -251,7 +292,7 @@ class ProductsController {
         include: listInclude,
         orderBy: [{ createdAt: 'desc' }, { sortOrder: 'asc' }],
       }),
-    ) as Array<{ id: string; imageUrl?: string | null }>;
+    ) as ProductMedia[];
     return withPublicImages(rows);
   }
 
@@ -279,7 +320,7 @@ class ProductsController {
         where: { id, isActive: true },
         include,
       }),
-    ) as { id: string; imageUrl?: string | null };
+    ) as ProductMedia;
     return withPublicImage(filterProductOptions(row));
   }
 }
@@ -292,11 +333,8 @@ class AdminProductsController {
     private readonly realtime: RealtimeService,
   ) {}
 
-  private async broadcast(product: { id: string; imageUrl?: string | null }) {
-    const payload = await withPublicImage(
-      serialize(product) as { id: string; imageUrl?: string | null },
-    );
-    // Single event — avoids double debounce resets on the app
+  private async broadcast(product: ProductMedia) {
+    const payload = await withPublicImage(serialize(product) as ProductMedia);
     this.realtime.emitMenu('menu.updated', { type: 'product', payload });
   }
 
@@ -307,38 +345,30 @@ class AdminProductsController {
         include: listInclude,
         orderBy: [{ createdAt: 'desc' }, { sortOrder: 'asc' }],
       }),
-    ) as Array<{ id: string; imageUrl?: string | null }>;
+    ) as ProductMedia[];
     return withPublicImages(rows);
   }
 
   @Get(':id')
   async one(@Param('id') id: string) {
-    // Admin gets all options + enabledOptionIds so the form can tick sub-options
     const row = serialize(
       await this.prisma.product.findFirstOrThrow({ where: { id }, include }),
-    ) as { id: string; imageUrl?: string | null };
+    ) as ProductMedia;
     return withPublicImage(row);
   }
 
   @Roles(...ManagerRoles)
   @Post()
-  @UseInterceptors(imageUpload)
+  @UseInterceptors(productImagesUpload)
   async create(
     @Body() dto: ProductDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: ProductImageFiles,
   ) {
-    const data = toProductData(
-      dto,
-      file,
-    ) as Prisma.ProductUncheckedCreateInput;
-    if (file) {
-      data.imageUrl = await toStoredImageUrl(file);
-    }
-    // New products must appear on the customer menu unless explicitly inactive
+    const data = toProductData(dto) as Prisma.ProductUncheckedCreateInput;
+    await applyImageFiles(data, files);
     if (data.isActive === undefined) data.isActive = true;
     if (data.isAvailable === undefined) data.isAvailable = true;
     if (data.isSoldOut === undefined) data.isSoldOut = false;
-    // Newest items float to the top of the home / menu list
     if (data.sortOrder === undefined) {
       const { _min } = await this.prisma.product.aggregate({
         _min: { sortOrder: true },
@@ -349,35 +379,28 @@ class AdminProductsController {
       data,
       include: listInclude,
     });
-    // Catalog seed only — admin form sets groups via PUT .../groups
     void ensureProductCustomizationDefaults(this.prisma);
     await this.broadcast(product);
-    return withPublicImage(
-      serialize(product) as { id: string; imageUrl?: string | null },
-    );
+    return withPublicImage(serialize(product) as ProductMedia);
   }
 
   @Roles(...AdminRoles)
   @Patch(':id')
-  @UseInterceptors(imageUpload)
+  @UseInterceptors(productImagesUpload)
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: ProductImageFiles,
   ) {
-    const data = toProductData(dto, file) as Prisma.ProductUncheckedUpdateInput;
-    if (file) {
-      data.imageUrl = await toStoredImageUrl(file);
-    }
+    const data = toProductData(dto) as Prisma.ProductUncheckedUpdateInput;
+    await applyImageFiles(data, files);
     const product = await this.prisma.product.update({
       where: { id },
       data,
       include: listInclude,
     });
     await this.broadcast(product);
-    return withPublicImage(
-      serialize(product) as { id: string; imageUrl?: string | null },
-    );
+    return withPublicImage(serialize(product) as ProductMedia);
   }
 
   @Roles(...AdminRoles)
@@ -389,9 +412,7 @@ class AdminProductsController {
       include,
     });
     await this.broadcast(product);
-    return withPublicImage(
-      serialize(product) as { id: string; imageUrl?: string | null },
-    );
+    return withPublicImage(serialize(product) as ProductMedia);
   }
 
   @Roles(...AdminRoles)
@@ -404,15 +425,12 @@ class AdminProductsController {
         ...(dto.isAvailable !== undefined
           ? { isAvailable: dto.isAvailable }
           : {}),
-        // Sold-out toggle should bring item back onto an active menu row
         ...(dto.isSoldOut === false ? { isActive: true, isAvailable: true } : {}),
       },
       include,
     });
     await this.broadcast(product);
-    return withPublicImage(
-      serialize(product) as { id: string; imageUrl?: string | null },
-    );
+    return withPublicImage(serialize(product) as ProductMedia);
   }
 
   @Roles(...ManagerRoles)
@@ -439,9 +457,7 @@ class AdminProductsController {
       include,
     });
     await this.broadcast(product);
-    return withPublicImage(
-      serialize(product) as { id: string; imageUrl?: string | null },
-    );
+    return withPublicImage(serialize(product) as ProductMedia);
   }
 }
 

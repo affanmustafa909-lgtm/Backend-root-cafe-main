@@ -100,6 +100,12 @@ for (const def of menuProducts) {
   const category = byCategoryId[def.categoryId];
   if (!category) throw new Error(`Missing category ${def.categoryId}`);
   const imageUrl = def.imageFile ? `/uploads/menu/${def.imageFile}` : null;
+  const imageUrlHot = def.imageFileHot
+    ? `/uploads/menu/${def.imageFileHot}`
+    : null;
+  const imageUrlCold = def.imageFileCold
+    ? `/uploads/menu/${def.imageFileCold}`
+    : null;
   const product = await prisma.product.upsert({
     where: { id: def.id },
     update: {
@@ -108,6 +114,8 @@ for (const def of menuProducts) {
       price: def.price,
       categoryId: category.id,
       imageUrl,
+      imageUrlHot,
+      imageUrlCold,
       allergens: def.allergens ?? null,
       sortOrder: def.sortOrder,
       isActive: true,
@@ -123,6 +131,8 @@ for (const def of menuProducts) {
       price: def.price,
       categoryId: category.id,
       imageUrl,
+      imageUrlHot,
+      imageUrlCold,
       allergens: def.allergens,
       sortOrder: def.sortOrder,
     },

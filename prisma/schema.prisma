@@ -93,6 +93,8 @@ model Product {
   description String?
   price       Decimal  @db.Decimal(10, 2)
   imageUrl    String?
+  imageUrlHot String?
+  imageUrlCold String?
   allergens   String?
   isAvailable     Boolean  @default(true)
   isSoldOut       Boolean  @default(false)
