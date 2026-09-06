@@ -12,6 +12,7 @@ import {
 import { AdminRoles, ManagerRoles, Public, Roles } from '../common/auth.js';
 import { serialize } from '../common/serialization.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RealtimeModule, RealtimeService } from '../realtime/realtime.module.js';
 
 const day = (value?: string) => {
   const date = value ? new Date(`${value}T00:00:00.000Z`) : new Date();
@@ -37,7 +38,14 @@ class CakeController {
 @Roles(...AdminRoles)
 @Controller('admin/cake-of-day')
 class AdminCakeController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+  ) {}
+
+  private bumpMenu() {
+    this.realtime.emitMenu('menu.updated', { type: 'cake-of-day' });
+  }
 
   @Get()
   async list(@Query('date') date?: string) {
@@ -69,10 +77,13 @@ class AdminCakeController {
       })
     )
       throw new ConflictException('An active cake already exists for this date');
-    return this.prisma.cakeOfTheDay.create({
+    const row = await this.prisma.cakeOfTheDay.create({
       data: { ...dto, date },
     });
+    this.bumpMenu();
+    return row;
   }
+
   @Roles(...ManagerRoles)
   @Patch(':id')
   async update(
@@ -87,12 +98,17 @@ class AdminCakeController {
       if (existing)
         throw new ConflictException('An active cake already exists for this date');
     }
-    return this.prisma.cakeOfTheDay.update({
+    const row = await this.prisma.cakeOfTheDay.update({
       where: { id },
       data: { ...dto, date },
     });
+    this.bumpMenu();
+    return row;
   }
 }
 
-@Module({ controllers: [CakeController, AdminCakeController] })
+@Module({
+  imports: [RealtimeModule],
+  controllers: [CakeController, AdminCakeController],
+})
 export class CakeOfDayModule {}

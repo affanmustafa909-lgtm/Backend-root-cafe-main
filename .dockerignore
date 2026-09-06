@@ -10,3 +10,8 @@ coverage
 .cursor
 .devin
 *.tsbuildinfo
+uploads/durable
+uploads/*.png
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.webp

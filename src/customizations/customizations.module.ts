@@ -106,7 +106,7 @@ class AdminCustomizationsController {
 
   @Roles(...ManagerRoles)
   @Post('groups')
-  createGroup(
+  async createGroup(
     @Body()
     dto: {
       name: string;
@@ -116,7 +116,9 @@ class AdminCustomizationsController {
       sortOrder?: number;
     },
   ) {
-    return this.prisma.customizationGroup.create({ data: dto });
+    const row = await this.prisma.customizationGroup.create({ data: dto });
+    this.bumpMenu();
+    return row;
   }
 
   @Roles(...ManagerRoles)
@@ -139,17 +141,27 @@ class AdminCustomizationsController {
 
   @Roles(...ManagerRoles)
   @Patch('groups/:id')
-  updateGroup(@Param('id') id: string, @Body() dto: Record<string, unknown>) {
-    return this.prisma.customizationGroup.update({ where: { id }, data: dto });
+  async updateGroup(
+    @Param('id') id: string,
+    @Body() dto: Record<string, unknown>,
+  ) {
+    const row = await this.prisma.customizationGroup.update({
+      where: { id },
+      data: dto,
+    });
+    this.bumpMenu();
+    return row;
   }
 
   @Roles(...ManagerRoles)
   @Delete('groups/:id')
-  deleteGroup(@Param('id') id: string) {
-    return this.prisma.customizationGroup.update({
+  async deleteGroup(@Param('id') id: string) {
+    const row = await this.prisma.customizationGroup.update({
       where: { id },
       data: { isActive: false },
     });
+    this.bumpMenu();
+    return row;
   }
 
   @Roles(...ManagerRoles)
@@ -164,7 +176,7 @@ class AdminCustomizationsController {
       sortOrder?: number;
     },
   ) {
-    return serialize(
+    const row = serialize(
       await this.prisma.customizationOption.create({
         data: {
           ...dto,
@@ -176,6 +188,8 @@ class AdminCustomizationsController {
         },
       }),
     );
+    this.bumpMenu();
+    return row;
   }
 
   @Roles(...ManagerRoles)
@@ -203,11 +217,13 @@ class AdminCustomizationsController {
 
   @Roles(...ManagerRoles)
   @Delete('options/:id')
-  deleteOption(@Param('id') id: string) {
-    return this.prisma.customizationOption.update({
+  async deleteOption(@Param('id') id: string) {
+    const row = await this.prisma.customizationOption.update({
       where: { id },
       data: { isActive: false, isAvailable: false },
     });
+    this.bumpMenu();
+    return row;
   }
 
   /** Update group + replace options (admin UI). Must stay after static paths. */

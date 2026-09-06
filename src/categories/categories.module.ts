@@ -9,7 +9,6 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
 import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { AdminRoles, ManagerRoles, Public, Roles } from '../common/auth.js';
 import { PrismaService } from '../prisma/prisma.service.js';

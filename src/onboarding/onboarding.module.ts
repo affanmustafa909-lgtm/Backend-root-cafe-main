@@ -23,6 +23,7 @@ import { Type, Transform } from 'class-transformer';
 import { AdminRoles, ManagerRoles, Public, Roles } from '../common/auth.js';
 import { serialize } from '../common/serialization.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RealtimeModule, RealtimeService } from '../realtime/realtime.module.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
 import { toStoredImageUrl } from '../uploads/durable-image.js';
 import { publicMediaUrl } from '../uploads/materialize.js';
@@ -112,7 +113,14 @@ class PublicOnboardingController {
 @Roles(...AdminRoles)
 @Controller('admin/onboarding')
 class AdminOnboardingController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+  ) {}
+
+  private bumpMenu() {
+    this.realtime.emitMenu('menu.updated', { type: 'onboarding' });
+  }
 
   @Get()
   async list() {
@@ -148,6 +156,7 @@ class AdminOnboardingController {
       create: { id: APP_ID, onboardingCtaText: dto.ctaText },
       update: { onboardingCtaText: dto.ctaText },
     });
+    this.bumpMenu();
     return { ctaText: row.onboardingCtaText };
   }
 
@@ -161,7 +170,7 @@ class AdminOnboardingController {
     const maxOrder = await this.prisma.onboardingSlide.aggregate({
       _max: { sortOrder: true },
     });
-    return serialize(
+    const row = serialize(
       await this.prisma.onboardingSlide.create({
         data: {
           title: dto.title,
@@ -176,6 +185,8 @@ class AdminOnboardingController {
         },
       }),
     );
+    this.bumpMenu();
+    return row;
   }
 
   @Roles(...ManagerRoles)
@@ -186,7 +197,7 @@ class AdminOnboardingController {
     @Body() dto: SlideDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return serialize(
+    const row = serialize(
       await this.prisma.onboardingSlide.update({
         where: { id },
         data: {
@@ -195,17 +206,21 @@ class AdminOnboardingController {
         },
       }),
     );
+    this.bumpMenu();
+    return row;
   }
 
   @Roles(...ManagerRoles)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     await this.prisma.onboardingSlide.delete({ where: { id } });
+    this.bumpMenu();
     return { ok: true };
   }
 }
 
 @Module({
+  imports: [RealtimeModule],
   controllers: [PublicOnboardingController, AdminOnboardingController],
 })
 export class OnboardingModule {}

@@ -279,7 +279,7 @@ class AdminProductsController {
     const payload = await withPublicImage(
       serialize(product) as { id: string; imageUrl?: string | null },
     );
-    this.realtime.emitMenu('product.availability_changed', payload);
+    // Single event — avoids double debounce resets on the app
     this.realtime.emitMenu('menu.updated', { type: 'product', payload });
   }
 
