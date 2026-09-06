@@ -1,15 +1,15 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { uploadDirectory } from './storage.js';
 
-const MAX_EDGE = 900;
-const JPEG_QUALITY = 72;
+const MAX_EDGE = 720;
+const JPEG_QUALITY = 68;
 
 /**
- * Persist an uploaded image so it survives Railway redeploys.
- * Compresses to JPEG and stores a data-URI in the DB (disk copy kept for local/static).
+ * Persist an uploaded image as a normal /uploads/durable/*.jpg file.
+ * Fast for clients — no base64-in-DB and no per-request materialize.
  */
 export async function toStoredImageUrl(
   file: Express.Multer.File,
@@ -23,9 +23,13 @@ export async function toStoredImageUrl(
     return `/uploads/${file.filename}`;
   }
 
-  let jpeg: Buffer;
+  const durableDir = join(uploadDirectory(), 'durable');
+  await mkdir(durableDir, { recursive: true });
+  const name = `${randomUUID()}.jpg`;
+  const full = join(durableDir, name);
+
   try {
-    jpeg = await sharp(source)
+    const jpeg = await sharp(source)
       .rotate()
       .resize(MAX_EDGE, MAX_EDGE, {
         fit: 'inside',
@@ -33,22 +37,12 @@ export async function toStoredImageUrl(
       })
       .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
       .toBuffer();
+    await writeFile(full, jpeg);
   } catch {
-    // Non-decodable / already tiny — fall back to raw bytes if small enough
-    if (source.length <= 180_000) {
-      const mime = file.mimetype || 'image/jpeg';
-      return `data:${mime};base64,${source.toString('base64')}`;
-    }
-    return `/uploads/${file.filename}`;
+    await writeFile(full, source);
   }
 
-  const durableDir = join(uploadDirectory(), 'durable');
-  await mkdir(durableDir, { recursive: true });
-  const name = `${randomUUID()}.jpg`;
-  await writeFile(join(durableDir, name), jpeg);
-
-  // Prefer data URI so live API keeps the image even when disk is wiped.
-  return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
+  return `/uploads/durable/${name}`;
 }
 
 export function isDurableImageUrl(url?: string | null): boolean {

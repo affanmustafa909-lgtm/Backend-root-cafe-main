@@ -103,16 +103,11 @@ const LEGACY_GROUP_IDS = [
 
 const ALL_GROUP_DEFS = [...DEFAULT_CUSTOMIZATION_DEFS, TEMPERATURE_GROUP];
 
+/** Seed missing catalog rows only — never overwrite admin edits (name/price/active). */
 async function upsertGroup(prisma: PrismaService, def: GroupDef) {
   await prisma.customizationGroup.upsert({
     where: { id: def.id },
-    update: {
-      name: def.name,
-      isActive: true,
-      isRequired: def.required,
-      selectionType: def.selectionType,
-      sortOrder: def.sortOrder,
-    },
+    update: {},
     create: {
       id: def.id,
       name: def.name,
@@ -124,14 +119,7 @@ async function upsertGroup(prisma: PrismaService, def: GroupDef) {
   for (const opt of def.options) {
     await prisma.customizationOption.upsert({
       where: { id: opt.id },
-      update: {
-        name: opt.name,
-        groupId: def.id,
-        additionalPrice: new Prisma.Decimal(opt.additionalPrice),
-        sortOrder: opt.sortOrder,
-        isActive: true,
-        isAvailable: true,
-      },
+      update: {},
       create: {
         id: opt.id,
         groupId: def.id,
@@ -164,7 +152,7 @@ export async function ensureDefaultCustomizationCatalog(
   });
 }
 
-export async function linkDefaultCustomizationsToProduct(
+async function syncTemperatureForProduct(
   prisma: PrismaService,
   productId: string,
   categoryId?: string | null,
@@ -178,21 +166,7 @@ export async function linkDefaultCustomizationsToProduct(
     catId = product?.categoryId ?? null;
   }
 
-  for (const def of DEFAULT_CUSTOMIZATION_DEFS) {
-    await prisma.productCustomizationGroup.upsert({
-      where: {
-        productId_groupId: { productId, groupId: def.id },
-      },
-      update: { sortOrder: def.sortOrder },
-      create: {
-        productId,
-        groupId: def.id,
-        sortOrder: def.sortOrder,
-      },
-    });
-  }
-
-  const wantsTemperature = catId && TEMPERATURE_CATEGORY_IDS.has(catId);
+  const wantsTemperature = !!(catId && TEMPERATURE_CATEGORY_IDS.has(catId));
   if (wantsTemperature) {
     await prisma.productCustomizationGroup.upsert({
       where: {
@@ -210,6 +184,54 @@ export async function linkDefaultCustomizationsToProduct(
       where: { productId, groupId: TEMPERATURE_GROUP.id },
     });
   }
+}
+
+/**
+ * Attach default groups to a brand-new product only.
+ * Never mutates products that already have admin-managed links.
+ */
+export async function linkDefaultCustomizationsToProduct(
+  prisma: PrismaService,
+  productId: string,
+  categoryId?: string | null,
+  options?: { force?: boolean },
+) {
+  const force = options?.force === true;
+  const existing = await prisma.productCustomizationGroup.count({
+    where: { productId },
+  });
+
+  // Respect admin show/hide — do not re-add Temperature or defaults
+  if (!force && existing > 0) {
+    await prisma.productCustomizationGroup.deleteMany({
+      where: {
+        productId,
+        groupId: { in: [...LEGACY_GROUP_IDS] },
+      },
+    });
+    return;
+  }
+
+  // Empty selection is intentional after admin save — do not reseed
+  if (!force && existing === 0) {
+    return;
+  }
+
+  for (const def of DEFAULT_CUSTOMIZATION_DEFS) {
+    await prisma.productCustomizationGroup.upsert({
+      where: {
+        productId_groupId: { productId, groupId: def.id },
+      },
+      update: { sortOrder: def.sortOrder },
+      create: {
+        productId,
+        groupId: def.id,
+        sortOrder: def.sortOrder,
+      },
+    });
+  }
+
+  await syncTemperatureForProduct(prisma, productId, categoryId);
 
   await prisma.productCustomizationGroup.deleteMany({
     where: {
@@ -219,30 +241,34 @@ export async function linkDefaultCustomizationsToProduct(
   });
 }
 
+/** Only seed products that never received any customization links. */
 export async function linkDefaultCustomizationsToAllProducts(
   prisma: PrismaService,
 ) {
   const products = await prisma.product.findMany({
-    select: { id: true, categoryId: true },
+    select: {
+      id: true,
+      categoryId: true,
+      _count: { select: { customizationGroups: true } },
+    },
   });
   for (const product of products) {
+    if (product._count.customizationGroups > 0) continue;
     await linkDefaultCustomizationsToProduct(
       prisma,
       product.id,
       product.categoryId,
+      { force: true },
     );
   }
 }
 
 let defaultsReady: Promise<void> | null = null;
 
-/** Idempotent — every product gets Size / Milk / Syrups / Whipped Cream (+ Temperature for matcha & protein). */
+/** Catalog seed only — never rewrites per-product admin group picks. */
 export function ensureProductCustomizationDefaults(prisma: PrismaService) {
   if (!defaultsReady) {
-    defaultsReady = (async () => {
-      await ensureDefaultCustomizationCatalog(prisma);
-      await linkDefaultCustomizationsToAllProducts(prisma);
-    })().catch((err) => {
+    defaultsReady = ensureDefaultCustomizationCatalog(prisma).catch((err) => {
       defaultsReady = null;
       throw err;
     });

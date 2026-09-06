@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { readdir, stat, writeFile } from 'node:fs/promises';
+import { readdir, stat, writeFile, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const dir =
@@ -26,7 +26,9 @@ for (const f of await readdir(dir)) {
     .jpeg({ quality: 70, mozjpeg: true })
     .toBuffer();
   if (out.length < before) {
-    await writeFile(full, out);
+    const tmp = `${full}.tmp.jpg`;
+    await writeFile(tmp, out);
+    await rename(tmp, full);
     saved += before - out.length;
     n += 1;
   }

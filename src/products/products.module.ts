@@ -187,18 +187,24 @@ class AvailabilityDto {
 const include = {
   category: true,
   customizationGroups: {
+    where: { group: { isActive: true } },
     orderBy: { sortOrder: 'asc' as const },
     include: {
       group: {
         include: {
           options: {
-            where: { isActive: true },
+            where: { isActive: true, isAvailable: true },
             orderBy: { sortOrder: 'asc' as const },
           },
         },
       },
     },
   },
+};
+
+/** List/home payload — skip heavy option trees (details loads full include). */
+const listInclude = {
+  category: true,
 };
 
 async function withPublicImage<T extends { id: string; imageUrl?: string | null }>(
@@ -220,11 +226,12 @@ class ProductsController {
   constructor(private readonly prisma: PrismaService) {}
   @Get()
   async list(@Query('categoryId') categoryId?: string) {
-    await ensureProductCustomizationDefaults(this.prisma);
+    // Catalog seed is cheap; do not block list on per-product linking
+    void ensureProductCustomizationDefaults(this.prisma);
     const rows = serialize(
       await this.prisma.product.findMany({
         where: { isActive: true, ...(categoryId && { categoryId }) },
-        include,
+        include: listInclude,
         orderBy: [{ createdAt: 'desc' }, { sortOrder: 'asc' }],
       }),
     ) as Array<{ id: string; imageUrl?: string | null }>;
@@ -249,8 +256,7 @@ class ProductsController {
 
   @Get(':id')
   async one(@Param('id') id: string) {
-    await ensureProductCustomizationDefaults(this.prisma);
-    await linkDefaultCustomizationsToProduct(this.prisma, id);
+    void ensureProductCustomizationDefaults(this.prisma);
     const row = serialize(
       await this.prisma.product.findFirstOrThrow({
         where: { id, isActive: true },
@@ -281,7 +287,7 @@ class AdminProductsController {
   async list() {
     const rows = serialize(
       await this.prisma.product.findMany({
-        include,
+        include: listInclude,
         orderBy: [{ createdAt: 'desc' }, { sortOrder: 'asc' }],
       }),
     ) as Array<{ id: string; imageUrl?: string | null }>;
@@ -325,8 +331,14 @@ class AdminProductsController {
       data,
       include,
     });
-    await ensureProductCustomizationDefaults(this.prisma);
-    await linkDefaultCustomizationsToProduct(this.prisma, product.id);
+    // Fast path: seed catalog in background; link defaults for this product only
+    void ensureProductCustomizationDefaults(this.prisma);
+    await linkDefaultCustomizationsToProduct(
+      this.prisma,
+      product.id,
+      product.categoryId,
+      { force: true },
+    );
     const withGroups = await this.prisma.product.findFirstOrThrow({
       where: { id: product.id },
       include,

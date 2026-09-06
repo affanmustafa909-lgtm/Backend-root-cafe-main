@@ -5,7 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
+import { PrismaService } from './prisma/prisma.service.js';
 import { uploadDirectory } from './uploads/storage.js';
+import { migrateEmbeddedImagesToDisk } from './uploads/materialize.js';
 
 function isAllowedCorsOrigin(origin: string | undefined, allowed: string[]): boolean {
   if (!origin) return true;
@@ -49,5 +51,11 @@ async function bootstrap() {
   );
   app.useStaticAssets(uploadDirectory(), { prefix: '/uploads/' });
   await app.listen(config.get<number>('port') ?? 3000);
+
+  // Background: convert legacy base64 images → disk files so /products stays fast
+  const prisma = app.get(PrismaService);
+  void migrateEmbeddedImagesToDisk(prisma)
+    .then(() => console.log('[uploads] embedded image migration done'))
+    .catch((err) => console.warn('[uploads] migration skipped', err));
 }
 await bootstrap();

@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "backend",
   "version": "0.0.1",
   "description": "",
@@ -24,7 +24,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
-    "restore:menu-images": "node --experimental-strip-types scripts/restore-menu-images.ts",`n    "embed:orphan-uploads": "tsx scripts/embed-orphan-uploads.ts"
+    "restore:menu-images": "node --experimental-strip-types scripts/restore-menu-images.ts",
+    "embed:orphan-uploads": "tsx scripts/embed-orphan-uploads.ts",
+    "hydrate:runtime-images": "tsx scripts/hydrate-runtime-images.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
