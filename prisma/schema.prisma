@@ -24,6 +24,7 @@ enum OrderStatus {
   PREPARING
   READY_FOR_PICKUP
   COMPLETED
+  DECLINED
 }
 
 enum PaymentMethod {

@@ -87,6 +87,17 @@ const transitions: Partial<Record<OrderStatus, OrderStatus>> = {
   READY_FOR_PICKUP: OrderStatus.COMPLETED,
 };
 
+function canTransition(from: OrderStatus, to: OrderStatus) {
+  if (to === OrderStatus.DECLINED) {
+    return (
+      from === OrderStatus.RECEIVED ||
+      from === OrderStatus.PREPARING ||
+      from === OrderStatus.READY_FOR_PICKUP
+    );
+  }
+  return transitions[from] === to;
+}
+
 @Injectable()
 class OrdersService {
   constructor(
@@ -280,12 +291,18 @@ class OrdersService {
       'ORDER_RECEIVED',
       'Order received',
       `Your order ${order.orderNumber} was received.`,
-      { orderId: order.id },
+      { orderId: order.id, status: OrderStatus.RECEIVED },
+    );
+    void this.notifications.notifyStaff(
+      'ORDER_NEW',
+      'New order',
+      `Order ${order.orderNumber} — ${order.total} EUR`,
+      { orderId: order.id, status: OrderStatus.RECEIVED },
     );
     return serialize(order);
   }
 
-  async updateStatus(id: string, status: OrderStatus) {
+  async updateStatus(id: string, status: OrderStatus, notes?: string) {
     const current = await this.prisma.order.findUnique({ where: { id } });
     if (!current) throw new NotFoundException();
 
@@ -325,7 +342,7 @@ class OrdersService {
       return serialize(refreshed);
     }
 
-    if (transitions[current.status] !== status) {
+    if (!canTransition(current.status, status)) {
       throw new BadRequestException(
         `Invalid status transition (${current.status} → ${status})`,
       );
@@ -339,6 +356,9 @@ class OrdersService {
         ...(status === OrderStatus.COMPLETED && {
           paymentStatus: PaymentStatus.PAID,
         }),
+        ...(status === OrderStatus.DECLINED && notes
+          ? { notes: notes.trim().slice(0, 500) }
+          : {}),
       },
       include: orderInclude,
     });
@@ -352,7 +372,6 @@ class OrdersService {
           stampApplied: order.stampApplied,
         });
       } catch (err) {
-        // Never fail order completion because loyalty failed.
         console.error('Stamp card apply failed', err);
       }
     }
@@ -374,14 +393,41 @@ class OrdersService {
         console.error('Stamp card emit failed', err);
       }
     }
-    if (status === OrderStatus.READY_FOR_PICKUP)
-      void this.notifications.send(
-        order.customerId,
-        'ORDER_READY',
-        'Order ready',
-        `Your order ${order.orderNumber} is ready for pickup.`,
-        { orderId: order.id },
-      );
+
+    const n = order.orderNumber;
+    const push: Partial<
+      Record<OrderStatus, { type: string; title: string; body: string }>
+    > = {
+      PREPARING: {
+        type: 'ORDER_PREPARING',
+        title: 'Order preparing',
+        body: `Your order ${n} is being prepared.`,
+      },
+      READY_FOR_PICKUP: {
+        type: 'ORDER_READY',
+        title: 'Order ready',
+        body: `Your order ${n} is ready for pickup.`,
+      },
+      COMPLETED: {
+        type: 'ORDER_COMPLETED',
+        title: 'Order completed',
+        body: `Thanks! Order ${n} is complete.`,
+      },
+      DECLINED: {
+        type: 'ORDER_DECLINED',
+        title: 'Order declined',
+        body: notes?.trim()
+          ? `Order ${n} was declined: ${notes.trim()}`
+          : `Sorry — order ${n} could not be fulfilled (item unavailable or café closed early).`,
+      },
+    };
+    const msg = push[status];
+    if (msg) {
+      void this.notifications.send(order.customerId, msg.type, msg.title, msg.body, {
+        orderId: order.id,
+        status,
+      });
+    }
     return serialized;
   }
 
@@ -463,8 +509,11 @@ class AdminOrdersController {
     );
   }
   @Patch(':id/status')
-  status(@Param('id') id: string, @Body() dto: { status: OrderStatus }) {
-    return this.orders.updateStatus(id, dto.status);
+  status(
+    @Param('id') id: string,
+    @Body() dto: { status: OrderStatus; notes?: string },
+  ) {
+    return this.orders.updateStatus(id, dto.status, dto.notes);
   }
   @Patch(':id/payment')
   payment(

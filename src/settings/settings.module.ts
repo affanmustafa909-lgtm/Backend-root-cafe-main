@@ -36,7 +36,7 @@ import {
   RealtimeService,
 } from '../realtime/realtime.module.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
-import { toStoredImageUrl } from '../uploads/durable-image.js';
+import { toStoredBannerImageUrl } from '../uploads/durable-image.js';
 import { publicMediaUrl } from '../uploads/materialize.js';
 import { PickupSettingsService } from './pickup-settings.service.js';
 import {
@@ -49,7 +49,7 @@ const BANNER_ID = 'default';
 const bannerUpload = FileInterceptor('image', {
   storage: imageStorage,
   fileFilter: imageFileFilter,
-  limits: { fileSize: 5_000_000 },
+  limits: { fileSize: 8_000_000 },
 });
 
 class UpdatePickupDto {
@@ -184,7 +184,7 @@ class SettingsController {
         aspectRatio: '2.08:1',
         maxFileMb: 5,
         formats: ['JPG', 'PNG', 'WEBP'],
-        note: 'Landscape image. App banner height is 168px; ~2:1 width fills edge-to-edge without heavy crop.',
+        note: 'Landscape ~2:1. Upload a sharp JPG; we keep up to 1600px wide at high quality.',
       },
       updatedAt: row.updatedAt,
     };
@@ -195,7 +195,7 @@ class SettingsController {
   @UseInterceptors(bannerUpload)
   async updateHomeBanner(@UploadedFile() file?: Express.Multer.File) {
     const data = file
-      ? { homeBannerImageUrl: await toStoredImageUrl(file) }
+      ? { homeBannerImageUrl: await toStoredBannerImageUrl(file) }
       : {};
     const row = await this.prisma.appConfig.upsert({
       where: { id: BANNER_ID },

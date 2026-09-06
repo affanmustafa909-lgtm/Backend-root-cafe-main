@@ -7,13 +7,19 @@ import {
   Post,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NotificationStatus } from '@prisma/client';
+import { AccountStatus, NotificationStatus, Role } from '@prisma/client';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import type { App } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { CurrentUser } from '../common/auth.js';
 import type { JwtUser } from '../common/auth.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+
+function isExpoPushToken(token: string) {
+  return (
+    token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[')
+  );
+}
 
 @Injectable()
 export class NotificationsService {
@@ -46,25 +52,93 @@ export class NotificationsService {
     const notification = await this.prisma.notification.create({
       data: { userId, type, title, body, payload },
     });
-    if (!this.firebase) return notification;
     const tokens = await this.prisma.deviceToken.findMany({ where: { userId } });
     if (!tokens.length) return notification;
-    try {
-      await getMessaging(this.firebase).sendEachForMulticast({
-        tokens: tokens.map(({ token }) => token),
-        notification: { title, body },
-        data: payload,
-      });
+
+    const expoTokens = tokens
+      .map((t) => t.token)
+      .filter((t) => isExpoPushToken(t));
+    const fcmTokens = tokens
+      .map((t) => t.token)
+      .filter((t) => !isExpoPushToken(t));
+
+    let sent = false;
+    let failed = false;
+
+    if (expoTokens.length) {
+      try {
+        const res = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(
+            expoTokens.map((to) => ({
+              to,
+              title,
+              body,
+              data: payload,
+              sound: 'default',
+              channelId: 'orders',
+            })),
+          ),
+        });
+        if (res.ok) sent = true;
+        else failed = true;
+      } catch {
+        failed = true;
+      }
+    }
+
+    if (fcmTokens.length && this.firebase) {
+      try {
+        await getMessaging(this.firebase).sendEachForMulticast({
+          tokens: fcmTokens,
+          notification: { title, body },
+          data: payload,
+          android: { priority: 'high', notification: { channelId: 'orders' } },
+        });
+        sent = true;
+      } catch {
+        failed = true;
+      }
+    } else if (fcmTokens.length && !this.firebase) {
+      failed = true;
+    }
+
+    if (sent) {
       return this.prisma.notification.update({
         where: { id: notification.id },
         data: { status: NotificationStatus.SENT },
       });
-    } catch {
+    }
+    if (failed) {
       return this.prisma.notification.update({
         where: { id: notification.id },
         data: { status: NotificationStatus.FAILED },
       });
     }
+    return notification;
+  }
+
+  /** Push to café staff (OWNER / MANAGER / STAFF) who registered a device. */
+  async notifyStaff(
+    type: string,
+    title: string,
+    body: string,
+    payload: Record<string, string> = {},
+  ) {
+    const staff = await this.prisma.user.findMany({
+      where: {
+        role: { in: [Role.OWNER, Role.MANAGER, Role.STAFF] },
+        accountStatus: AccountStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    await Promise.all(
+      staff.map((u) => this.send(u.id, type, title, body, payload)),
+    );
   }
 }
 
