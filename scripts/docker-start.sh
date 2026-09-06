@@ -10,6 +10,8 @@ MIGRATIONS="
 20260901120000_user_avatar_url
 20260901130000_app_config_pickup
 20260902180000_stamp_card
+20260906120000_product_option_visibility
+20260906140000_product_hot_cold_images
 "
 
 baseline_existing_db() {
