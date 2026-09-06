@@ -125,13 +125,35 @@ class AdminCustomizationsController {
   @Put('products/:productId/groups')
   async associate(
     @Param('productId') productId: string,
-    @Body() dto: { groupIds: string[] },
+    @Body()
+    dto: {
+      groupIds?: string[];
+      groups?: { groupId: string; optionIds?: string[] }[];
+    },
   ) {
+    const links =
+      dto.groups?.length
+        ? dto.groups.map((g, sortOrder) => ({
+            groupId: g.groupId,
+            sortOrder,
+            enabledOptionIds: (g.optionIds ?? []).filter(Boolean),
+          }))
+        : (dto.groupIds ?? []).map((groupId, sortOrder) => ({
+            groupId,
+            sortOrder,
+            enabledOptionIds: [] as string[],
+          }));
+
     await this.prisma.$transaction([
       this.prisma.productCustomizationGroup.deleteMany({ where: { productId } }),
-      ...dto.groupIds.map((groupId, sortOrder) =>
+      ...links.map((link) =>
         this.prisma.productCustomizationGroup.create({
-          data: { productId, groupId, sortOrder },
+          data: {
+            productId,
+            groupId: link.groupId,
+            sortOrder: link.sortOrder,
+            enabledOptionIds: link.enabledOptionIds,
+          },
         }),
       ),
     ]);

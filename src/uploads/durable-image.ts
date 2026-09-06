@@ -1,15 +1,13 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
-import { uploadDirectory } from './storage.js';
 
 const MAX_EDGE = 720;
 const JPEG_QUALITY = 68;
 
 /**
- * Persist an uploaded image as a normal /uploads/durable/*.jpg file.
- * Fast for clients — no base64-in-DB and no per-request materialize.
+ * Persist an uploaded image in the DB as a compressed data-URI.
+ * Railway (and similar) wipe local disk on redeploy — file-only paths break.
+ * Clients still get /uploads/runtime/... via publicMediaUrl materialize.
  */
 export async function toStoredImageUrl(
   file: Express.Multer.File,
@@ -23,11 +21,6 @@ export async function toStoredImageUrl(
     return `/uploads/${file.filename}`;
   }
 
-  const durableDir = join(uploadDirectory(), 'durable');
-  await mkdir(durableDir, { recursive: true });
-  const name = `${randomUUID()}.jpg`;
-  const full = join(durableDir, name);
-
   try {
     const jpeg = await sharp(source)
       .rotate()
@@ -37,12 +30,13 @@ export async function toStoredImageUrl(
       })
       .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
       .toBuffer();
-    await writeFile(full, jpeg);
+    return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
   } catch {
-    await writeFile(full, source);
+    const mime = file.mimetype?.startsWith('image/')
+      ? file.mimetype
+      : 'image/jpeg';
+    return `data:${mime};base64,${source.toString('base64')}`;
   }
-
-  return `/uploads/durable/${name}`;
 }
 
 export function isDurableImageUrl(url?: string | null): boolean {

@@ -37,7 +37,6 @@ import { toStoredImageUrl } from '../uploads/durable-image.js';
 import { publicMediaUrl } from '../uploads/materialize.js';
 import {
   ensureProductCustomizationDefaults,
-  linkDefaultCustomizationsToProduct,
 } from './default-customizations.js';
 
 const toBool = ({ value }: { value: unknown }) => {
@@ -202,6 +201,24 @@ const include = {
   },
 };
 
+/** Apply per-product option visibility (enabledOptionIds). */
+function filterProductOptions<T extends Record<string, unknown>>(product: T): T {
+  const links = product.customizationGroups as
+    | {
+        enabledOptionIds?: string[];
+        group?: { options?: { id: string }[] } | null;
+      }[]
+    | undefined;
+  if (!links?.length) return product;
+  for (const link of links) {
+    const allowed = link.enabledOptionIds ?? [];
+    if (!allowed.length || !link.group?.options) continue;
+    const allow = new Set(allowed);
+    link.group.options = link.group.options.filter((o) => allow.has(o.id));
+  }
+  return product;
+}
+
 /** List/home payload — skip heavy option trees (details loads full include). */
 const listInclude = {
   category: true,
@@ -263,7 +280,7 @@ class ProductsController {
         include,
       }),
     ) as { id: string; imageUrl?: string | null };
-    return withPublicImage(row);
+    return withPublicImage(filterProductOptions(row));
   }
 }
 
@@ -296,6 +313,7 @@ class AdminProductsController {
 
   @Get(':id')
   async one(@Param('id') id: string) {
+    // Admin gets all options + enabledOptionIds so the form can tick sub-options
     const row = serialize(
       await this.prisma.product.findFirstOrThrow({ where: { id }, include }),
     ) as { id: string; imageUrl?: string | null };
@@ -329,23 +347,13 @@ class AdminProductsController {
     }
     const product = await this.prisma.product.create({
       data,
-      include,
+      include: listInclude,
     });
-    // Fast path: seed catalog in background; link defaults for this product only
+    // Catalog seed only — admin form sets groups via PUT .../groups
     void ensureProductCustomizationDefaults(this.prisma);
-    await linkDefaultCustomizationsToProduct(
-      this.prisma,
-      product.id,
-      product.categoryId,
-      { force: true },
-    );
-    const withGroups = await this.prisma.product.findFirstOrThrow({
-      where: { id: product.id },
-      include,
-    });
-    await this.broadcast(withGroups);
+    await this.broadcast(product);
     return withPublicImage(
-      serialize(withGroups) as { id: string; imageUrl?: string | null },
+      serialize(product) as { id: string; imageUrl?: string | null },
     );
   }
 
@@ -364,7 +372,7 @@ class AdminProductsController {
     const product = await this.prisma.product.update({
       where: { id },
       data,
-      include,
+      include: listInclude,
     });
     await this.broadcast(product);
     return withPublicImage(

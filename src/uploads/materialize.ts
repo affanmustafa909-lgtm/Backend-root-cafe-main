@@ -1,11 +1,10 @@
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile, access, copyFile } from 'node:fs/promises';
+import { mkdir, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { uploadDirectory } from './storage.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 
 const runtimeDir = () => join(uploadDirectory(), 'runtime');
-const durableDir = () => join(uploadDirectory(), 'durable');
 
 function extForMime(mime: string): string {
   if (mime.includes('png')) return '.png';
@@ -53,10 +52,10 @@ export async function publicMediaUrl(
 }
 
 /**
- * One-shot: rewrite data-URI columns to /uploads/durable files so list APIs stay fast.
+ * Warm /uploads/runtime from embedded data-URIs after deploy.
+ * Keep data: values in the DB — rewriting to disk paths breaks on ephemeral hosts.
  */
 export async function migrateEmbeddedImagesToDisk(prisma: PrismaService) {
-  await mkdir(durableDir(), { recursive: true });
   await mkdir(runtimeDir(), { recursive: true });
 
   const products = await prisma.product.findMany({
@@ -64,23 +63,7 @@ export async function migrateEmbeddedImagesToDisk(prisma: PrismaService) {
     select: { id: true, imageUrl: true },
   });
   for (const row of products) {
-    const path = await materializeDataImage(row.imageUrl!, `product:${row.id}`);
-    if (!path) continue;
-    const runtimeFile = join(uploadDirectory(), path.replace(/^\//, '').replace(/^uploads\//, ''));
-    const durableName = `${row.id.replace(/[^a-zA-Z0-9_-]/g, '')}.jpg`;
-    const durablePath = join(durableDir(), durableName);
-    try {
-      await copyFile(runtimeFile, durablePath);
-      await prisma.product.update({
-        where: { id: row.id },
-        data: { imageUrl: `/uploads/durable/${durableName}` },
-      });
-    } catch {
-      await prisma.product.update({
-        where: { id: row.id },
-        data: { imageUrl: path },
-      });
-    }
+    await materializeDataImage(row.imageUrl!, `product:${row.id}`);
   }
 
   const settings = await prisma.appConfig.findMany({
@@ -88,16 +71,7 @@ export async function migrateEmbeddedImagesToDisk(prisma: PrismaService) {
     select: { id: true, homeBannerImageUrl: true },
   });
   for (const row of settings) {
-    const path = await materializeDataImage(
-      row.homeBannerImageUrl!,
-      `banner:${row.id}`,
-    );
-    if (path) {
-      await prisma.appConfig.update({
-        where: { id: row.id },
-        data: { homeBannerImageUrl: path },
-      });
-    }
+    await materializeDataImage(row.homeBannerImageUrl!, `banner:${row.id}`);
   }
 
   try {
@@ -106,16 +80,7 @@ export async function migrateEmbeddedImagesToDisk(prisma: PrismaService) {
       select: { id: true, imageUrl: true },
     });
     for (const row of slides) {
-      const path = await materializeDataImage(
-        row.imageUrl!,
-        `onboarding:${row.id}`,
-      );
-      if (path) {
-        await prisma.onboardingSlide.update({
-          where: { id: row.id },
-          data: { imageUrl: path },
-        });
-      }
+      await materializeDataImage(row.imageUrl!, `onboarding:${row.id}`);
     }
   } catch {
     // schema may not have onboarding in older DBs
