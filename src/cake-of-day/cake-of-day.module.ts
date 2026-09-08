@@ -2,8 +2,10 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   Module,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -249,6 +251,18 @@ class AdminCakeController {
     });
     this.bumpMenu();
     return withPublicCakeImage(serialize(row) as CakeRow);
+  }
+
+  @Roles(...ManagerRoles)
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    const existing = await this.prisma.cakeOfTheDay.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException('Cake of the day not found');
+    await this.prisma.cakeOfTheDay.delete({ where: { id } });
+    this.bumpMenu();
+    return { ok: true, id };
   }
 
   @Roles(...ManagerRoles)
