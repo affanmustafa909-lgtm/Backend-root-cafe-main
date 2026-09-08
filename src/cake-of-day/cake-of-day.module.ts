@@ -123,7 +123,7 @@ class AdminCakeController {
   }
 
   @Get()
-  async list(@Query('date') date?: string) {
+  async today(@Query('date') date?: string) {
     const row = serialize(
       await this.prisma.cakeOfTheDay.findFirst({
         where: { date: day(date), isActive: true },
@@ -133,9 +133,21 @@ class AdminCakeController {
     return withPublicCakeImage(row);
   }
 
+  @Get('history')
+  async history() {
+    const rows = serialize(
+      await this.prisma.cakeOfTheDay.findMany({
+        include: { product: true },
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        take: 50,
+      }),
+    ) as CakeRow[];
+    return Promise.all(rows.map((row) => withPublicCakeImage(row)));
+  }
+
   /**
    * Admin form uses PUT + multipart (name/price/date/available/image).
-   * Upserts today's (or chosen date) featured cake.
+   * Always adds a new featured cake entry (previous same-day entry is deactivated).
    */
   @Roles(...ManagerRoles)
   @Put()
@@ -160,95 +172,81 @@ class AdminCakeController {
     const isAvailable =
       asBool(body.available) ?? asBool(body.isAvailable) ?? true;
     const price = asNumber(body.price);
-    const imageUrl = file ? await toStoredImageUrl(file) : undefined;
+    const imageUrl = file ? await toStoredImageUrl(file) : null;
 
-    const existing = await this.prisma.cakeOfTheDay.findFirst({
+    // One active cake per date — archive previous featured entries for this day.
+    await this.prisma.cakeOfTheDay.updateMany({
       where: { date, isActive: true },
+      data: { isActive: false },
+    });
+
+    let category = await this.prisma.category.findFirst({
+      where: {
+        OR: [
+          { name: { contains: 'Cake', mode: 'insensitive' } },
+          { name: { contains: 'Dessert', mode: 'insensitive' } },
+          { name: { contains: 'Pastry', mode: 'insensitive' } },
+        ],
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+    if (!category) {
+      category = await this.prisma.category.findFirst({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+      });
+    }
+    if (!category) {
+      category = await this.prisma.category.create({
+        data: {
+          name: 'Cakes',
+          description: 'Featured cakes',
+          sortOrder: 99,
+          isActive: true,
+        },
+      });
+    }
+
+    const product = await this.prisma.product.create({
+      data: {
+        name: title,
+        description,
+        price: new Prisma.Decimal(price && price > 0 ? price : 0),
+        categoryId: category.id,
+        imageUrl,
+        isActive: true,
+        isAvailable,
+        isSoldOut: !isAvailable,
+        sortOrder: 0,
+      },
+    });
+
+    const row = await this.prisma.cakeOfTheDay.create({
+      data: {
+        title,
+        description,
+        isAvailable,
+        isActive: true,
+        productId: product.id,
+        imageUrl,
+        date,
+      },
       include: { product: true },
     });
 
-    // Keep / create a linked product so banner tap can open product details.
-    let productId = body.productId || existing?.productId || null;
-    if (productId) {
-      await this.prisma.product.update({
-        where: { id: productId },
-        data: {
-          name: title,
-          description,
-          ...(price !== undefined
-            ? { price: new Prisma.Decimal(price) }
-            : {}),
-          ...(imageUrl ? { imageUrl } : {}),
-          isActive: true,
-          isAvailable,
-          isSoldOut: !isAvailable,
-        },
-      });
-    } else {
-      let category = await this.prisma.category.findFirst({
-        where: {
-          OR: [
-            { name: { contains: 'Cake', mode: 'insensitive' } },
-            { name: { contains: 'Dessert', mode: 'insensitive' } },
-            { name: { contains: 'Pastry', mode: 'insensitive' } },
-          ],
-          isActive: true,
-        },
-        orderBy: { sortOrder: 'asc' },
-      });
-      if (!category) {
-        category = await this.prisma.category.findFirst({
-          where: { isActive: true },
-          orderBy: { sortOrder: 'asc' },
-        });
-      }
-      if (!category) {
-        category = await this.prisma.category.create({
-          data: {
-            name: 'Cakes',
-            description: 'Featured cakes',
-            sortOrder: 99,
-            isActive: true,
-          },
-        });
-      }
-      const product = await this.prisma.product.create({
-        data: {
-          name: title,
-          description,
-          price: new Prisma.Decimal(price && price > 0 ? price : 0),
-          categoryId: category.id,
-          imageUrl: imageUrl ?? null,
-          isActive: true,
-          isAvailable,
-          isSoldOut: !isAvailable,
-          sortOrder: 0,
-        },
-      });
-      productId = product.id;
-    }
+    this.bumpMenu();
+    return withPublicCakeImage(serialize(row) as CakeRow);
+  }
 
-    const data = {
-      title,
-      description,
-      isAvailable,
-      isActive: true,
-      productId,
-      ...(imageUrl ? { imageUrl } : {}),
-      date,
-    };
-
-    const row = existing
-      ? await this.prisma.cakeOfTheDay.update({
-          where: { id: existing.id },
-          data,
-          include: { product: true },
-        })
-      : await this.prisma.cakeOfTheDay.create({
-          data,
-          include: { product: true },
-        });
-
+  @Roles(...ManagerRoles)
+  @Patch(':id/deactivate')
+  async deactivate(@Param('id') id: string) {
+    const row = await this.prisma.cakeOfTheDay.update({
+      where: { id },
+      data: { isActive: false },
+      include: { product: true },
+    });
     this.bumpMenu();
     return withPublicCakeImage(serialize(row) as CakeRow);
   }
