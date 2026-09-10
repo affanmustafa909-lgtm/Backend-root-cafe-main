@@ -108,6 +108,23 @@ class UpdateStampCardDto {
   subtitle?: string | null;
 }
 
+class UpdateLegalDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(50_000)
+  impressum?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50_000)
+  privacy?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50_000)
+  terms?: string | null;
+}
+
 @Roles(...AdminRoles)
 @Controller('admin/settings')
 class SettingsController {
@@ -163,6 +180,52 @@ class SettingsController {
     const result = await this.stampCards.updateConfig(dto);
     this.realtime.emitMenu('menu.updated', { type: 'stamp-card' });
     return result;
+  }
+
+  @Get('legal')
+  async legal() {
+    const row = await this.prisma.appConfig.upsert({
+      where: { id: BANNER_ID },
+      create: { id: BANNER_ID },
+      update: {},
+    });
+    return {
+      impressum: row.legalImpressum ?? '',
+      privacy: row.legalPrivacy ?? '',
+      terms: row.legalTerms ?? '',
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  @Roles(...ManagerRoles)
+  @Patch('legal')
+  async updateLegal(@Body() dto: UpdateLegalDto) {
+    const data: {
+      legalImpressum?: string | null;
+      legalPrivacy?: string | null;
+      legalTerms?: string | null;
+    } = {};
+    if (dto.impressum !== undefined) {
+      data.legalImpressum = dto.impressum?.trim() || null;
+    }
+    if (dto.privacy !== undefined) {
+      data.legalPrivacy = dto.privacy?.trim() || null;
+    }
+    if (dto.terms !== undefined) {
+      data.legalTerms = dto.terms?.trim() || null;
+    }
+    const row = await this.prisma.appConfig.upsert({
+      where: { id: BANNER_ID },
+      create: { id: BANNER_ID, ...data },
+      update: data,
+    });
+    this.realtime.emitMenu('menu.updated', { type: 'legal' });
+    return {
+      impressum: row.legalImpressum ?? '',
+      privacy: row.legalPrivacy ?? '',
+      terms: row.legalTerms ?? '',
+      updatedAt: row.updatedAt,
+    };
   }
 
   @Get('home-banner')
@@ -285,6 +348,11 @@ class PublicSettingsController {
         slotIntervalMinutes: pickup.slotIntervalMinutes,
         maxDaysAhead: pickup.maxDaysAhead,
         asapEstimateMinutes: pickup.asapEstimateMinutes,
+      },
+      legal: {
+        impressum: appConfig?.legalImpressum ?? null,
+        privacy: appConfig?.legalPrivacy ?? null,
+        terms: appConfig?.legalTerms ?? null,
       },
     };
   }

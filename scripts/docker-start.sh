@@ -13,6 +13,7 @@ MIGRATIONS="
 20260906120000_product_option_visibility
 20260906140000_product_hot_cold_images
 20260907010000_order_declined
+20260910120000_app_config_legal
 "
 
 baseline_existing_db() {

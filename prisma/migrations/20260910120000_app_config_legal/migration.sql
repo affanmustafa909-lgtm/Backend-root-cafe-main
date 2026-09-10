@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "legalImpressum" TEXT;
+ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "legalPrivacy" TEXT;
+ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "legalTerms" TEXT;

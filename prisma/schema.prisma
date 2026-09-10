@@ -194,6 +194,12 @@ model AppConfig {
   stampCardRequired     Int      @default(8)
   stampCardTitle        String?  @default("Stamp Card")
   stampCardSubtitle     String?  @default("Collect 8 drinks on the app — the 9th is free")
+  /** Impressum / legal notice (plain text). */
+  legalImpressum        String?  @db.Text
+  /** Datenschutzerklärung / privacy policy (plain text). */
+  legalPrivacy          String?  @db.Text
+  /** AGB / terms of use (plain text). */
+  legalTerms            String?  @db.Text
   updatedAt             DateTime @updatedAt
 }
 
