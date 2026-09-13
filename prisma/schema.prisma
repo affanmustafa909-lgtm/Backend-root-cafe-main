@@ -200,6 +200,14 @@ model AppConfig {
   legalPrivacy          String?  @db.Text
   /** AGB / terms of use (plain text). */
   legalTerms            String?  @db.Text
+  cafeName              String?
+  cafeStreet            String?
+  cafePostalCity        String?
+  cafePhone             String?
+  cafeEmail             String?
+  cafeOwner             String?
+  cafeVatId             String?
+  cafeImpressumNotes    String?  @db.Text
   updatedAt             DateTime @updatedAt
 }
 

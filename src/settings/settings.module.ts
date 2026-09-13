@@ -43,6 +43,13 @@ import {
   StampCardModule,
   StampCardService,
 } from '../loyalty/stamp-card.service.js';
+import {
+  composeImpressum,
+  GERMAN_PRIVACY,
+  GERMAN_TERMS,
+  resolveLegalTexts,
+  type CafeContact,
+} from './legal-templates.js';
 
 const BANNER_ID = 'default';
 
@@ -111,8 +118,43 @@ class UpdateStampCardDto {
 class UpdateLegalDto {
   @IsOptional()
   @IsString()
-  @MaxLength(50_000)
-  impressum?: string | null;
+  @MaxLength(200)
+  cafeName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cafeStreet?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cafePostalCity?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  cafePhone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cafeEmail?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cafeOwner?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  cafeVatId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  cafeImpressumNotes?: string | null;
 
   @IsOptional()
   @IsString()
@@ -123,6 +165,31 @@ class UpdateLegalDto {
   @IsString()
   @MaxLength(50_000)
   terms?: string | null;
+}
+
+function legalAdminView(row: {
+  cafeName?: string | null;
+  cafeStreet?: string | null;
+  cafePostalCity?: string | null;
+  cafePhone?: string | null;
+  cafeEmail?: string | null;
+  cafeOwner?: string | null;
+  cafeVatId?: string | null;
+  cafeImpressumNotes?: string | null;
+  legalImpressum?: string | null;
+  legalPrivacy?: string | null;
+  legalTerms?: string | null;
+  updatedAt?: Date | null;
+}) {
+  const resolved = resolveLegalTexts(row);
+  return {
+    contact: resolved.contact,
+    impressum: resolved.impressum,
+    privacy: resolved.privacy,
+    terms: resolved.terms,
+    templates: { privacy: GERMAN_PRIVACY, terms: GERMAN_TERMS },
+    updatedAt: row.updatedAt ?? null,
+  };
 }
 
 @Roles(...AdminRoles)
@@ -189,43 +256,65 @@ class SettingsController {
       create: { id: BANNER_ID },
       update: {},
     });
-    return {
-      impressum: row.legalImpressum ?? '',
-      privacy: row.legalPrivacy ?? '',
-      terms: row.legalTerms ?? '',
-      updatedAt: row.updatedAt,
-    };
+    return legalAdminView(row);
   }
 
   @Roles(...ManagerRoles)
   @Patch('legal')
   async updateLegal(@Body() dto: UpdateLegalDto) {
-    const data: {
-      legalImpressum?: string | null;
-      legalPrivacy?: string | null;
-      legalTerms?: string | null;
-    } = {};
-    if (dto.impressum !== undefined) {
-      data.legalImpressum = dto.impressum?.trim() || null;
-    }
-    if (dto.privacy !== undefined) {
-      data.legalPrivacy = dto.privacy?.trim() || null;
-    }
-    if (dto.terms !== undefined) {
-      data.legalTerms = dto.terms?.trim() || null;
-    }
-    const row = await this.prisma.appConfig.upsert({
+    const text = (v?: string | null) => {
+      if (v === undefined) return undefined;
+      const trimmed = (v ?? '').trim();
+      return trimmed || null;
+    };
+    const contactPatch: Partial<CafeContact> = {};
+    if (dto.cafeName !== undefined) contactPatch.name = dto.cafeName?.trim() ?? '';
+    if (dto.cafeStreet !== undefined)
+      contactPatch.street = dto.cafeStreet?.trim() ?? '';
+    if (dto.cafePostalCity !== undefined)
+      contactPatch.postalCity = dto.cafePostalCity?.trim() ?? '';
+    if (dto.cafePhone !== undefined)
+      contactPatch.phone = dto.cafePhone?.trim() ?? '';
+    if (dto.cafeEmail !== undefined)
+      contactPatch.email = dto.cafeEmail?.trim() ?? '';
+    if (dto.cafeOwner !== undefined)
+      contactPatch.owner = dto.cafeOwner?.trim() ?? '';
+    if (dto.cafeVatId !== undefined)
+      contactPatch.vatId = dto.cafeVatId?.trim() ?? '';
+    if (dto.cafeImpressumNotes !== undefined)
+      contactPatch.notes = dto.cafeImpressumNotes?.trim() ?? '';
+
+    const existing = await this.prisma.appConfig.upsert({
       where: { id: BANNER_ID },
-      create: { id: BANNER_ID, ...data },
-      update: data,
+      create: { id: BANNER_ID },
+      update: {},
+    });
+    const mergedContact = {
+      ...resolveLegalTexts(existing).contact,
+      ...contactPatch,
+    };
+    const hasContact = Object.values(mergedContact).some((v) => v.trim());
+    const data = {
+      cafeName: text(dto.cafeName),
+      cafeStreet: text(dto.cafeStreet),
+      cafePostalCity: text(dto.cafePostalCity),
+      cafePhone: text(dto.cafePhone),
+      cafeEmail: text(dto.cafeEmail),
+      cafeOwner: text(dto.cafeOwner),
+      cafeVatId: text(dto.cafeVatId),
+      cafeImpressumNotes: text(dto.cafeImpressumNotes),
+      legalPrivacy: text(dto.privacy),
+      legalTerms: text(dto.terms),
+      legalImpressum: hasContact
+        ? composeImpressum(mergedContact)
+        : existing.legalImpressum?.trim() || composeImpressum(mergedContact),
+    };
+    const row = await this.prisma.appConfig.update({
+      where: { id: BANNER_ID },
+      data,
     });
     this.realtime.emitMenu('menu.updated', { type: 'legal' });
-    return {
-      impressum: row.legalImpressum ?? '',
-      privacy: row.legalPrivacy ?? '',
-      terms: row.legalTerms ?? '',
-      updatedAt: row.updatedAt,
-    };
+    return legalAdminView(row);
   }
 
   @Get('home-banner')
@@ -349,11 +438,14 @@ class PublicSettingsController {
         maxDaysAhead: pickup.maxDaysAhead,
         asapEstimateMinutes: pickup.asapEstimateMinutes,
       },
-      legal: {
-        impressum: appConfig?.legalImpressum ?? null,
-        privacy: appConfig?.legalPrivacy ?? null,
-        terms: appConfig?.legalTerms ?? null,
-      },
+      legal: (() => {
+        const resolved = resolveLegalTexts(appConfig ?? {});
+        return {
+          impressum: resolved.impressum,
+          privacy: resolved.privacy,
+          terms: resolved.terms,
+        };
+      })(),
     };
   }
 }
