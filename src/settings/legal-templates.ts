@@ -58,7 +58,7 @@ Technische Dienstleister, die Daten in unserem Auftrag verarbeiten können:
 Bei Cloud- und Push-Diensten kann eine Übermittlung in Drittländer (z. B. USA) stattfinden. Soweit erforderlich, stützen wir uns auf Standardvertragsklauseln der EU-Kommission (Art. 46 DSGVO).
 
 6. Ihre Rechte
-Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO) sowie das Recht, eine Einwilligung mit Wirkung für die Zukunft zu widerrufen. Das Konto können Sie in der App unter Profil löschen.
+Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO) sowie das Recht, eine Einwilligung mit Wirkung für die Zukunft zu widerrufen. Das Konto löschen Sie in der App unter Profil → Zahnrad (Einstellungen) → Konto löschen. Dabei werden Name, E-Mail, Telefonnummer, Profilbild und Push-Token entfernt. Bestellungen können wir nur noch soweit aufbewahren, wie Handels- oder Steuerrecht es verlangt; sie sind danach keinem nutzbaren Konto mehr zugeordnet.
 
 7. Beschwerde
 Sie können sich bei einer Datenschutzaufsichtsbehörde beschweren, insbesondere am Sitz des Cafés. Übersicht: https://www.bfdi.bund.de

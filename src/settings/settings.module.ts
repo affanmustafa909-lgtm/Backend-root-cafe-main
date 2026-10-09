@@ -3,8 +3,10 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Module,
   Patch,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -21,6 +23,7 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import type { Response } from 'express';
 import { Role } from '@prisma/client';
 import {
   AdminRoles,
@@ -45,11 +48,13 @@ import {
 } from '../loyalty/stamp-card.service.js';
 import {
   composeImpressum,
+  contactFromRow,
   GERMAN_PRIVACY,
   GERMAN_TERMS,
   resolveLegalTexts,
   type CafeContact,
 } from './legal-templates.js';
+import { renderPrivacyPolicyHtml } from './privacy-page.js';
 
 const BANNER_ID = 'default';
 
@@ -450,12 +455,34 @@ class PublicSettingsController {
   }
 }
 
+@Public()
+@Controller()
+class PrivacyPageController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get(['privacy', 'privacy-policy'])
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  async privacy(@Res() res: Response) {
+    const row = await this.prisma.appConfig.findUnique({
+      where: { id: BANNER_ID },
+    });
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; form-action 'none'",
+    );
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(renderPrivacyPolicyHtml(contactFromRow(row ?? {})));
+  }
+}
+
 @Module({
   imports: [RealtimeModule, StampCardModule],
   controllers: [
     SettingsController,
     PublicSettingsController,
     CustomerLoyaltyController,
+    PrivacyPageController,
   ],
   providers: [PickupSettingsService],
   exports: [PickupSettingsService, StampCardModule],
