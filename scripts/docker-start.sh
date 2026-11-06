@@ -15,6 +15,7 @@ MIGRATIONS="
 20260907010000_order_declined
 20260910120000_app_config_legal
 20260913120000_app_config_cafe_contact
+20261106200000_password_reset_tokens
 "
 
 baseline_existing_db() {

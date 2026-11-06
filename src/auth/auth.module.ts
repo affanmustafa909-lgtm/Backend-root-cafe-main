@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -7,6 +8,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   Module,
   Patch,
   Post,
@@ -22,6 +24,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AccountStatus, Role } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   IsEmail,
   IsOptional,
@@ -31,11 +34,20 @@ import {
 } from 'class-validator';
 import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { CurrentUser, Public, Roles } from '../common/auth.js';
+import {
+  AdminRoles,
+  CurrentUser,
+  Public,
+  Roles,
+} from '../common/auth.js';
 import type { JwtUser } from '../common/auth.js';
+import { MailService } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { imageFileFilter, imageStorage } from '../uploads/storage.js';
 import { toStoredImageUrl } from '../uploads/durable-image.js';
+
+const STAFF_ROLES: Role[] = [Role.OWNER, Role.MANAGER, Role.STAFF];
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 export class RegisterDto {
   @IsEmail() email: string;
@@ -50,6 +62,17 @@ export class LoginDto {
 export class UpdateProfileDto {
   @IsOptional() @IsString() @Length(2, 100) name?: string;
   @IsOptional() @IsString() phone?: string;
+}
+export class ChangeCredentialsDto {
+  @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @IsString() @MinLength(8) newPassword?: string;
+}
+export class ForgotPasswordDto {
+  @IsEmail() email: string;
+}
+export class ResetPasswordDto {
+  @IsString() @MinLength(20) token: string;
+  @IsString() @MinLength(8) password: string;
 }
 
 const avatarUpload = FileInterceptor('image', {
@@ -107,10 +130,13 @@ class LoginRateLimiter {
 
 @Injectable()
 class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {}
 
   private token(user: JwtUser) {
@@ -120,6 +146,21 @@ class AuthService {
         email: user.email,
         role: user.role,
       }),
+    };
+  }
+
+  private hashResetToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private isStaff(role: Role) {
+    return STAFF_ROLES.includes(role);
+  }
+
+  private withFeatures<T extends object>(account: T) {
+    return {
+      ...account,
+      features: { reporting: this.config.get<boolean>('reportingEnabled') },
     };
   }
 
@@ -157,10 +198,7 @@ class AuthService {
       where: { id: user.id },
       select: userPublicSelect,
     });
-    return {
-      ...account,
-      features: { reporting: this.config.get<boolean>('reportingEnabled') },
-    };
+    return this.withFeatures(account);
   }
 
   async updateProfile(user: JwtUser, dto: UpdateProfileDto) {
@@ -172,9 +210,142 @@ class AuthService {
       },
       select: userPublicSelect,
     });
+    return this.withFeatures(account);
+  }
+
+  async changeCredentials(user: JwtUser, dto: ChangeCredentialsDto) {
+    if (!this.isStaff(user.role))
+      throw new UnauthorizedException('Staff accounts only');
+
+    const email = dto.email?.trim().toLowerCase();
+    const newPassword = dto.newPassword?.trim();
+    if (!email && !newPassword)
+      throw new BadRequestException('Provide a new email and/or password');
+
+    const account = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+    });
+
+    if (email && email !== account.email) {
+      const taken = await this.prisma.user.findUnique({ where: { email } });
+      if (taken) throw new ConflictException('Email already in use');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        ...(email ? { email } : {}),
+        ...(newPassword
+          ? { passwordHash: await bcrypt.hash(newPassword, 12) }
+          : {}),
+      },
+      select: userPublicSelect,
+    });
+
     return {
-      ...account,
-      features: { reporting: this.config.get<boolean>('reportingEnabled') },
+      user: this.withFeatures(updated),
+      ...this.token(updated),
+    };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.trim().toLowerCase();
+    const generic = {
+      success: true,
+      message:
+        'If that email belongs to a staff account, reset instructions were sent.',
+    };
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (
+      !user ||
+      user.accountStatus !== AccountStatus.ACTIVE ||
+      !this.isStaff(user.role)
+    ) {
+      return generic;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashResetToken(rawToken);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.deleteMany({
+        where: { userId: user.id, usedAt: null },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: { userId: user.id, tokenHash, expiresAt },
+      }),
+    ]);
+
+    const portal = this.config.get<string>('adminPortalUrl')!;
+    const resetUrl = `${portal}/reset-password?token=${rawToken}`;
+    const text = [
+      `Hi ${user.name},`,
+      '',
+      'We received a request to reset your Roots Café admin password.',
+      'Open this link within 1 hour to choose a new password:',
+      resetUrl,
+      '',
+      'If you did not request this, you can ignore this email.',
+    ].join('\n');
+
+    const { sent } = await this.mail.sendMail({
+      to: user.email,
+      subject: 'Reset your Roots Café admin password',
+      text,
+    });
+
+    if (!sent) {
+      this.logger.warn(`Password reset link for ${user.email}: ${resetUrl}`);
+    }
+
+    const isProd = this.config.get<string>('nodeEnv') === 'production';
+    return {
+      ...generic,
+      emailSent: sent,
+      ...(!isProd || !sent ? { debugResetUrl: resetUrl } : {}),
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const tokenHash = this.hashResetToken(dto.token.trim());
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (
+      !record ||
+      record.usedAt ||
+      record.expiresAt.getTime() < Date.now() ||
+      record.user.accountStatus !== AccountStatus.ACTIVE ||
+      !this.isStaff(record.user.role)
+    ) {
+      throw new BadRequestException('Reset link is invalid or expired');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash: await bcrypt.hash(dto.password, 12) },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.passwordResetToken.deleteMany({
+        where: {
+          userId: record.userId,
+          usedAt: null,
+          id: { not: record.id },
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      message: 'Password updated. You can sign in with your new password.',
     };
   }
 
@@ -185,10 +356,7 @@ class AuthService {
       data: { avatarUrl: await toStoredImageUrl(file) },
       select: userPublicSelect,
     });
-    return {
-      ...account,
-      features: { reporting: this.config.get<boolean>('reportingEnabled') },
-    };
+    return this.withFeatures(account);
   }
 
   async clearAvatar(user: JwtUser) {
@@ -197,10 +365,7 @@ class AuthService {
       data: { avatarUrl: null },
       select: userPublicSelect,
     });
-    return {
-      ...account,
-      features: { reporting: this.config.get<boolean>('reportingEnabled') },
-    };
+    return this.withFeatures(account);
   }
 
   async deleteAccount(user: JwtUser) {
@@ -238,6 +403,18 @@ class AuthController {
     this.limiter.check(req.ip ?? 'unknown');
     return this.auth.login(dto);
   }
+  @Public()
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
+    this.limiter.check(`forgot:${req.ip ?? 'unknown'}`);
+    return this.auth.forgotPassword(dto);
+  }
+  @Public()
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+    this.limiter.check(`reset:${req.ip ?? 'unknown'}`);
+    return this.auth.resetPassword(dto);
+  }
   @Post('logout') logout() {
     return { success: true };
   }
@@ -249,6 +426,14 @@ class AuthController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.auth.updateProfile(user, dto);
+  }
+  @Patch('me/credentials')
+  @Roles(...AdminRoles)
+  changeCredentials(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ChangeCredentialsDto,
+  ) {
+    return this.auth.changeCredentials(user, dto);
   }
   @Patch('me/avatar')
   @UseInterceptors(avatarUpload)
@@ -283,7 +468,7 @@ class AuthController {
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LoginRateLimiter],
+  providers: [AuthService, JwtStrategy, LoginRateLimiter, MailService],
   exports: [JwtModule],
 })
 export class AuthModule {}

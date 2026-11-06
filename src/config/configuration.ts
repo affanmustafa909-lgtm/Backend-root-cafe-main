@@ -18,6 +18,14 @@ export interface AppConfiguration {
   currency: string;
   reportingEnabled: boolean;
   pickup: PickupConfiguration;
+  adminPortalUrl: string;
+  smtpHost?: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpFrom?: string;
+  nodeEnv: string;
 }
 
 const bool = (value: string | undefined, fallback = false) =>
@@ -53,4 +61,14 @@ export default (): AppConfiguration => ({
     maxDaysAhead: Number(process.env.PICKUP_MAX_DAYS_AHEAD ?? 7),
     asapEstimateMinutes: optionalInt(process.env.ASAP_ESTIMATE_MINUTES),
   },
+  adminPortalUrl: (
+    process.env.ADMIN_PORTAL_URL ?? 'http://localhost:5173'
+  ).replace(/\/$/, ''),
+  smtpHost: process.env.SMTP_HOST || undefined,
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpSecure: bool(process.env.SMTP_SECURE, Number(process.env.SMTP_PORT ?? 587) === 465),
+  smtpUser: process.env.SMTP_USER || undefined,
+  smtpPass: process.env.SMTP_PASS || undefined,
+  smtpFrom: process.env.SMTP_FROM || undefined,
+  nodeEnv: process.env.NODE_ENV ?? 'development',
 });
