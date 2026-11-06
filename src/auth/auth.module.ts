@@ -27,6 +27,7 @@ import bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   Length,
@@ -34,12 +35,7 @@ import {
 } from 'class-validator';
 import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import {
-  AdminRoles,
-  CurrentUser,
-  Public,
-  Roles,
-} from '../common/auth.js';
+import { CurrentUser, Public, Roles } from '../common/auth.js';
 import type { JwtUser } from '../common/auth.js';
 import { MailService } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -69,6 +65,10 @@ export class ChangeCredentialsDto {
 }
 export class ForgotPasswordDto {
   @IsEmail() email: string;
+  /** Where the reset link should open: admin web portal or customer app. */
+  @IsOptional()
+  @IsIn(['admin', 'app'])
+  audience?: 'admin' | 'app';
 }
 export class ResetPasswordDto {
   @IsString() @MinLength(20) token: string;
@@ -214,9 +214,6 @@ class AuthService {
   }
 
   async changeCredentials(user: JwtUser, dto: ChangeCredentialsDto) {
-    if (!this.isStaff(user.role))
-      throw new UnauthorizedException('Staff accounts only');
-
     const email = dto.email?.trim().toLowerCase();
     const newPassword = dto.newPassword?.trim();
     if (!email && !newPassword)
@@ -250,18 +247,21 @@ class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const email = dto.email.trim().toLowerCase();
+    const audience = dto.audience === 'app' ? 'app' : 'admin';
     const generic = {
       success: true,
       message:
-        'If that email belongs to a staff account, reset instructions were sent.',
+        'If that email belongs to an account, reset instructions were sent.',
     };
 
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (
-      !user ||
-      user.accountStatus !== AccountStatus.ACTIVE ||
-      !this.isStaff(user.role)
-    ) {
+    const roleOk =
+      !!user &&
+      (audience === 'admin'
+        ? this.isStaff(user.role)
+        : user.role === Role.CUSTOMER);
+
+    if (!user || user.accountStatus !== AccountStatus.ACTIVE || !roleOk) {
       return generic;
     }
 
@@ -278,12 +278,21 @@ class AuthService {
       }),
     ]);
 
-    const portal = this.config.get<string>('adminPortalUrl')!;
-    const resetUrl = `${portal}/reset-password?token=${rawToken}`;
+    const resetUrl =
+      audience === 'app'
+        ? `${this.config.get<string>('appDeepLinkBase')}reset-password?token=${rawToken}`
+        : `${this.config.get<string>('adminPortalUrl')}/reset-password?token=${rawToken}`;
+
+    const subject =
+      audience === 'app'
+        ? 'Reset your Roots Café password'
+        : 'Reset your Roots Café admin password';
     const text = [
       `Hi ${user.name},`,
       '',
-      'We received a request to reset your Roots Café admin password.',
+      audience === 'app'
+        ? 'We received a request to reset your Roots Café app password.'
+        : 'We received a request to reset your Roots Café admin password.',
       'Open this link within 1 hour to choose a new password:',
       resetUrl,
       '',
@@ -292,7 +301,7 @@ class AuthService {
 
     const { sent } = await this.mail.sendMail({
       to: user.email,
-      subject: 'Reset your Roots Café admin password',
+      subject,
       text,
     });
 
@@ -304,7 +313,9 @@ class AuthService {
     return {
       ...generic,
       emailSent: sent,
-      ...(!isProd || !sent ? { debugResetUrl: resetUrl } : {}),
+      ...(!isProd || !sent
+        ? { debugResetUrl: resetUrl, debugResetToken: rawToken }
+        : {}),
     };
   }
 
@@ -319,8 +330,7 @@ class AuthService {
       !record ||
       record.usedAt ||
       record.expiresAt.getTime() < Date.now() ||
-      record.user.accountStatus !== AccountStatus.ACTIVE ||
-      !this.isStaff(record.user.role)
+      record.user.accountStatus !== AccountStatus.ACTIVE
     ) {
       throw new BadRequestException('Reset link is invalid or expired');
     }
@@ -428,7 +438,6 @@ class AuthController {
     return this.auth.updateProfile(user, dto);
   }
   @Patch('me/credentials')
-  @Roles(...AdminRoles)
   changeCredentials(
     @CurrentUser() user: JwtUser,
     @Body() dto: ChangeCredentialsDto,

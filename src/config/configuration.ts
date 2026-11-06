@@ -19,6 +19,7 @@ export interface AppConfiguration {
   reportingEnabled: boolean;
   pickup: PickupConfiguration;
   adminPortalUrl: string;
+  appDeepLinkBase: string;
   smtpHost?: string;
   smtpPort: number;
   smtpSecure: boolean;
@@ -64,6 +65,7 @@ export default (): AppConfiguration => ({
   adminPortalUrl: (
     process.env.ADMIN_PORTAL_URL ?? 'http://localhost:5173'
   ).replace(/\/$/, ''),
+  appDeepLinkBase: process.env.APP_DEEP_LINK_BASE ?? 'rootscafe://',
   smtpHost: process.env.SMTP_HOST || undefined,
   smtpPort: Number(process.env.SMTP_PORT ?? 587),
   smtpSecure: bool(process.env.SMTP_SECURE, Number(process.env.SMTP_PORT ?? 587) === 465),
