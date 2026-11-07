@@ -142,6 +142,11 @@ export class StampCardService {
     return view;
   }
 
+  /** One stamp per drink (line quantity), not per order. */
+  private drinkCountFromItems(items: { quantity: number }[]): number {
+    return items.reduce((sum, item) => sum + Math.max(0, item.quantity | 0), 0);
+  }
+
   /**
    * Called when order becomes COMPLETED.
    * Avoids short interactive transactions (Railway latency often exceeds 5s).
@@ -166,6 +171,16 @@ export class StampCardService {
     if (!config.enabled) return;
 
     try {
+      const items = await this.prisma.orderItem.findMany({
+        where: { orderId: order.id },
+        select: { quantity: true },
+      });
+      const drinkCount = this.drinkCountFromItems(items);
+      // A redeemed free drink does not earn a stamp; extra drinks in the same order still do.
+      const earned = order.redeemedStampReward
+        ? Math.max(0, drinkCount - 1)
+        : drinkCount;
+
       await this.getOrCreateCard(order.customerId);
 
       if (order.redeemedStampReward) {
@@ -175,16 +190,17 @@ export class StampCardService {
         await this.prisma.customerStampCard.update({
           where: { customerId: order.customerId },
           data: {
-            stamps: Math.max(0, card.stamps - config.stampsRequired),
+            stamps: Math.max(0, card.stamps - config.stampsRequired) + earned,
+            lifetimeStamps: { increment: earned },
             freeDrinksEarned: { increment: 1 },
           },
         });
-      } else {
+      } else if (earned > 0) {
         await this.prisma.customerStampCard.update({
           where: { customerId: order.customerId },
           data: {
-            stamps: { increment: 1 },
-            lifetimeStamps: { increment: 1 },
+            stamps: { increment: earned },
+            lifetimeStamps: { increment: earned },
           },
         });
       }

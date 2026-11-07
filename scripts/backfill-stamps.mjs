@@ -24,6 +24,18 @@ async function applyOne(order) {
       update: {},
     });
 
+    const items = await p.orderItem.findMany({
+      where: { orderId: order.id },
+      select: { quantity: true },
+    });
+    const drinkCount = items.reduce(
+      (sum, item) => sum + Math.max(0, item.quantity | 0),
+      0,
+    );
+    const earned = order.redeemedStampReward
+      ? Math.max(0, drinkCount - 1)
+      : drinkCount;
+
     if (order.redeemedStampReward) {
       const card = await p.customerStampCard.findUniqueOrThrow({
         where: { customerId: order.customerId },
@@ -31,21 +43,24 @@ async function applyOne(order) {
       await p.customerStampCard.update({
         where: { customerId: order.customerId },
         data: {
-          stamps: Math.max(0, card.stamps - required),
+          stamps: Math.max(0, card.stamps - required) + earned,
+          lifetimeStamps: { increment: earned },
           freeDrinksEarned: { increment: 1 },
         },
       });
-      return 'redeemed';
+      return `redeemed+${earned}`;
     }
 
-    await p.customerStampCard.update({
-      where: { customerId: order.customerId },
-      data: {
-        stamps: { increment: 1 },
-        lifetimeStamps: { increment: 1 },
-      },
-    });
-    return 'stamped';
+    if (earned > 0) {
+      await p.customerStampCard.update({
+        where: { customerId: order.customerId },
+        data: {
+          stamps: { increment: earned },
+          lifetimeStamps: { increment: earned },
+        },
+      });
+    }
+    return `stamped+${earned}`;
   } catch (err) {
     await p.order.updateMany({
       where: { id: order.id, stampApplied: true },

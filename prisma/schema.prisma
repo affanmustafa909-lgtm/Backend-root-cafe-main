@@ -202,7 +202,7 @@ model AppConfig {
   pickupSlotIntervalMin Int?
   pickupMaxDaysAhead    Int?
   asapEstimateMinutes   Int?
-  /** Digital stamp card — collect N stamps, next drink free. */
+  /** Digital stamp card — collect N drink stamps, next drink free. */
   stampCardEnabled      Boolean  @default(true)
   /** Stamps needed before a free drink (8 → 9th drink free). */
   stampCardRequired     Int      @default(8)
