@@ -1,8 +1,25 @@
-import { Controller, Get, Module, Param, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Module,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { Role } from '@prisma/client';
+import bcrypt from 'bcrypt';
+import { IsString, MinLength } from 'class-validator';
 import { Roles } from '../common/auth.js';
 import { serialize } from '../common/serialization.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+
+export class AdminResetCustomerPasswordDto {
+  @IsString()
+  @MinLength(8)
+  password: string;
+}
 
 @Roles(Role.OWNER, Role.MANAGER)
 @Controller('admin/customers')
@@ -58,6 +75,37 @@ class CustomersController {
         },
       }),
     );
+  }
+
+  @Post(':id/reset-password')
+  async resetPassword(
+    @Param('id') id: string,
+    @Body() dto: AdminResetCustomerPasswordDto,
+  ) {
+    const customer = await this.prisma.user.findFirst({
+      where: { id, role: Role.CUSTOMER },
+      select: { id: true },
+    });
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: customer.id },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.deleteMany({
+        where: { userId: customer.id, usedAt: null },
+      }),
+    ]);
+
+    return {
+      message:
+        'Temporary password set. Share it with the customer so they can sign in.',
+    };
   }
 }
 
