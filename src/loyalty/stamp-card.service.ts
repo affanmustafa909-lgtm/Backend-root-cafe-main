@@ -142,9 +142,32 @@ export class StampCardService {
     return view;
   }
 
-  /** One stamp per drink (line quantity), not per order. */
-  private drinkCountFromItems(items: { quantity: number }[]): number {
-    return items.reduce((sum, item) => sum + Math.max(0, item.quantity | 0), 0);
+  /**
+   * Stamps from order lines: quantity × product.stampsAwarded (default 1 if
+   * the product was removed). Matches admin “stamps linked to product”.
+   */
+  private stampsFromItems(
+    items: {
+      quantity: number;
+      unitPriceSnapshot: Prisma.Decimal;
+      product: { stampsAwarded: number } | null;
+    }[],
+  ): { total: number; freeUnitStamps: number } {
+    let total = 0;
+    let freeUnitStamps = 1;
+    let bestUnit = new Prisma.Decimal(-1);
+
+    for (const item of items) {
+      const qty = Math.max(0, item.quantity | 0);
+      const perUnit = Math.max(0, item.product?.stampsAwarded ?? 1);
+      total += qty * perUnit;
+      if (item.unitPriceSnapshot.greaterThan(bestUnit)) {
+        bestUnit = item.unitPriceSnapshot;
+        freeUnitStamps = perUnit;
+      }
+    }
+
+    return { total, freeUnitStamps };
   }
 
   /**
@@ -173,13 +196,17 @@ export class StampCardService {
     try {
       const items = await this.prisma.orderItem.findMany({
         where: { orderId: order.id },
-        select: { quantity: true },
+        select: {
+          quantity: true,
+          unitPriceSnapshot: true,
+          product: { select: { stampsAwarded: true } },
+        },
       });
-      const drinkCount = this.drinkCountFromItems(items);
-      // A redeemed free drink does not earn a stamp; extra drinks in the same order still do.
+      const { total, freeUnitStamps } = this.stampsFromItems(items);
+      // A redeemed free drink does not earn its product stamps; other lines still do.
       const earned = order.redeemedStampReward
-        ? Math.max(0, drinkCount - 1)
-        : drinkCount;
+        ? Math.max(0, total - freeUnitStamps)
+        : total;
 
       await this.getOrCreateCard(order.customerId);
 

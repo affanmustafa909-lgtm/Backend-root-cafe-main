@@ -90,6 +90,12 @@ class ProductDto {
   @IsOptional() @Transform(toBool) @IsBoolean() active?: boolean;
   @IsOptional() @Transform(toBool) @IsBoolean() isTopSale?: boolean;
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  stampsAwarded?: number;
+  @IsOptional()
   @Transform(toOptNumber)
   @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsInt()
@@ -119,6 +125,12 @@ class UpdateProductDto {
   @IsOptional() @Transform(toBool) @IsBoolean() isActive?: boolean;
   @IsOptional() @Transform(toBool) @IsBoolean() active?: boolean;
   @IsOptional() @Transform(toBool) @IsBoolean() isTopSale?: boolean;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  stampsAwarded?: number;
   @IsOptional()
   @Transform(toOptNumber)
   @ValidateIf((_, v) => v !== null && v !== undefined)
@@ -164,6 +176,7 @@ function toProductData(
   const sortOrder = asNumber(dto.sortOrder);
   const discountPercent = asOptNumber(dto.discountPercent);
   const compareAtPrice = asOptNumber(dto.compareAtPrice);
+  const stampsAwarded = asNumber(dto.stampsAwarded);
 
   return {
     ...(dto.categoryId ? { categoryId: dto.categoryId } : {}),
@@ -176,6 +189,9 @@ function toProductData(
     ...(isSoldOut !== undefined ? { isSoldOut } : {}),
     ...(isActive !== undefined ? { isActive } : {}),
     ...(isTopSale !== undefined ? { isTopSale } : {}),
+    ...(stampsAwarded !== undefined
+      ? { stampsAwarded: Math.max(0, Math.trunc(stampsAwarded)) }
+      : {}),
     ...(discountPercent !== undefined
       ? {
           discountPercent:

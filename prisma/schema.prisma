@@ -114,6 +114,8 @@ model Product {
   isAvailable     Boolean  @default(true)
   isSoldOut       Boolean  @default(false)
   isTopSale       Boolean  @default(false)
+  /** Stamps earned per unit when an order with this product is completed. */
+  stampsAwarded   Int      @default(1)
   discountPercent Int?
   compareAtPrice  Decimal? @db.Decimal(10, 2)
   sortOrder       Int      @default(0)
